@@ -41,6 +41,7 @@ async function getAvaialableModels(ollamaInstance:Ollama): Promise<ModelResponse
     const availableModels = await ollamaInstance.list();
     return availableModels.models;
 }
+let webview: vscode.Webview;
 
 export function activate(context: vscode.ExtensionContext) {
     globalThis.isRunningOnWindows = os.platform() === 'win32' ? true : false;
@@ -55,14 +56,14 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     const extensionContext = context;
-    context.subscriptions.push(vscode.window.registerWebviewViewProvider('OllamaChatView', {
+    context.subscriptions.push(vscode.window.registerWebviewViewProvider('OllamaChat.View', {
         resolveWebviewView(webviewView: vscode.WebviewView, context: vscode.WebviewViewResolveContext, token: vscode.CancellationToken) {
-            const view = webviewView.webview;
-            view.options = {
+            webview = webviewView.webview;
+            webview.options = {
                 enableScripts: true,
                 localResourceRoots: [extensionContext.extensionUri]
             };
-            view.html = getWebViewHtmlContent(extensionContext, view);
+            webview.html = getWebViewHtmlContent(extensionContext, webview);
             
             const ollamaInstance = new Ollama({
                 host: serverUrl
@@ -73,7 +74,7 @@ export function activate(context: vscode.ExtensionContext) {
             if (serverUrl === 'http://localhost:11434') {
                 ollamaInstalled = executableIsAvailable("ollama");
                 if (ollamaInstalled === false) {
-                    view.postMessage({ command: "ollamaInstallErorr", text: "ollama not installed" });
+                    webview.postMessage({ command: "ollamaInstallErorr", text: "ollama not installed" });
                 }
             }
 
@@ -86,17 +87,17 @@ export function activate(context: vscode.ExtensionContext) {
                 }
 
                 if (!selectedModel) {
-                    view.postMessage({
+                    webview.postMessage({
                         command: "ollamaModelsNotDownloaded",
                         text: "No models available. Please download a model first."
                     });
                     return;
                 }
 
-                view.postMessage({ availableModels: availableModels, selectedModel: selectedModel });
+                webview.postMessage({ availableModels: availableModels, selectedModel: selectedModel });
 
                 const chatHistory = extensionContext.globalState.get<ChatHistoryItem[]>('ollamaChatHistory', []);
-                view.postMessage({
+                webview.postMessage({
                     command: 'loadHistory',
                     history: chatHistory
                 });
@@ -124,7 +125,7 @@ export function activate(context: vscode.ExtensionContext) {
                 // }
             });
 
-            view.onDidReceiveMessage(async (message: any) => {
+            webview.onDidReceiveMessage(async (message: any) => {
                 let responseText = "";
 
                 if (message.command === 'chat' || message.command === 'stopResponse') {
@@ -167,11 +168,11 @@ export function activate(context: vscode.ExtensionContext) {
                         // Collect full response
                         for await (const part of response) {
                             if(globalThis.stopResponse){
-                                view.postMessage({messageStreamEnded: true});
+                                webview.postMessage({messageStreamEnded: true});
                                 return;
                             }
                             responseText += part.message.content;
-                            view.postMessage({
+                            webview.postMessage({
                                 command: "chatResponse", 
                                 text: responseText,
                                 selectedModel: selectedModel
@@ -189,19 +190,19 @@ export function activate(context: vscode.ExtensionContext) {
                         historyItem.messages = [...currentConversation];
                         await extensionContext.globalState.update('ollamaChatHistory', updatedHistory);
 
-                        view.postMessage({
+                        webview.postMessage({
                             command: "updateHistoryAnswer",
                             question: message.question,
                             answer: responseText,
                             timestamp: historyItem.timestamp
                         });
 
-                        view.postMessage({messageStreamEnded: true});
+                        webview.postMessage({messageStreamEnded: true});
                     } catch (error: any) {
                         if (error.name === 'AbortError') {
-                            view.postMessage({messageStreamEnded: true});
+                            webview.postMessage({messageStreamEnded: true});
                         } else {
-                            view.postMessage({
+                            webview.postMessage({
                                 command: "error", 
                                 text: "An error occurred while processing your request"
                             });
@@ -218,10 +219,23 @@ export function activate(context: vscode.ExtensionContext) {
                     selectedModel = message.selectedModel;
                 } else if (message.command === "newChat") {
                     currentConversation = [];
+                } else if (message.command === 'log') {
+                    console.log(message.msg);
                 }
             });
         }
     }));
+
+    context.subscriptions.push(vscode.commands.registerCommand("ollama-chat-rain.History", () => {
+        if (webview) {
+            webview.postMessage({ command: "history" });
+        }
+     }));
+    context.subscriptions.push(vscode.commands.registerCommand("ollama-chat-rain.NewChat", () => {
+        if (webview) {
+            webview.postMessage({ command: "clearChat" });
+        }
+     }));
 }
 
 export function deactivate() { }

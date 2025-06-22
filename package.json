@@ -35,21 +35,37 @@
     "views": {
       "OllamaChat":[
         {
-          "id": "OllamaChatView",
+          "id": "OllamaChat.View",
           "icon": ".docs/icon.png",
           "name": "Ollama聊天",
           "type": "webview"
         }
       ]
     },
+    "menus": {
+      "view/title":[
+        {
+          "command": "ollama-chat-rain.History",
+          "when": "view == OllamaChat.View",
+          "group": "navigation"
+        },
+        {
+          "command": "ollama-chat-rain.NewChat",
+          "when": "view == OllamaChat.View",
+          "group": "navigation"
+        }
+      ]
+    },
     "commands": [
       {
-        "command": "ollama-chat-rain.ollamaChat",
-        "title": "Ollama聊天"
+        "command": "ollama-chat-rain.History",
+        "title": "历史记录",
+        "icon": "$(timeline-open)"
       },
       {
-        "command": "ollama-chat-rain.askSelected",
-        "title": "Ollama Chat: 回答选择的内容"
+        "command": "ollama-chat-rain.NewChat",
+        "title": "新的聊天",
+        "icon": "$(terminal-new)"
       }
     ],
     "configuration": {

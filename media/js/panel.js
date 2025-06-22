@@ -3,8 +3,6 @@ const chatContainer = document.getElementById('chatContainer');
 const questionInput = document.getElementById('questionInput');
 const submitBtn = document.getElementById('submitBtn');
 const modelSelector = document.getElementById('modelSelector');
-const refreshBtn = document.getElementById('refreshBtn');
-const historyBtn = document.getElementById('historyBtn');
 const historyPanel = document.getElementById('historyPanel');
 const closeHistoryBtn = document.getElementById('closeHistoryBtn');
 const historyList = document.getElementById('historyList');
@@ -16,6 +14,11 @@ const stopIcon = document.getElementById('stopIcon');
 let currentAssistantMessage = null;
 let autoScrollEnabled = true;  // flag to control auto-scroll
 let isGenerating = false;
+let canRefresh = false;
+
+function CW(msg) {
+    vscode.postMessage({ command: "log", msg });
+}
 
 function scrollToBottom() {
     chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -39,20 +42,29 @@ document.addEventListener('DOMContentLoaded', () => {
     hljs.addPlugin(new CopyButtonPlugin({ autohide: false }));
 });
 
+questionInput.style.height = 'auto';
 questionInput.addEventListener('input', () => {
-    // automatically resize text area based on input
+    // 输入文本时自动调整输入框的高度，最大200像素高
     questionInput.style.height = 'auto';
-    questionInput.style.height = questionInput.scrollHeight + 'px';
+    
+    const maxHeight = 200;
+    if(questionInput.scrollHeight > maxHeight){
+        questionInput.style.overflow = 'auto';
+        questionInput.style.height = maxHeight + 'px';
+    }else{
+        questionInput.style.overflow = 'hidden';
+        questionInput.style.height = questionInput.scrollHeight + 'px';
+    }
 });
 
 const md = markdownit({
     highlight: (str, lang) => {
         if (lang && hljs.getLanguage(lang)) {
             try {
-                return `<pre class="bg-[#252526] rounded p-4 my-2 border border-[#404040] overflow-x-auto"><code class="hljs language-${lang}">${hljs.highlight(str, { language: lang, ignoreIllegals: true }).value}</code></pre>`;
+                return `<pre class="bg-[#2222] rounded p-1 my-1 border border-[#0ac7] overflow-x-auto"><code class="hljs language-${lang}">${hljs.highlight(str, { language: lang, ignoreIllegals: true }).value}</code></pre>`;
             } catch (__) {}
         }
-        return `<pre class="bg-[#252526] rounded p-4 my-2 border border-[#404040]"><code>${md.utils.escapeHtml(str)}</code></pre>`;
+        return `<pre class="bg-[#2222] rounded p-1 my-1 border border-[#0ac7]"><code>${md.utils.escapeHtml(str)}</code></pre>`;
     }
 });
 
@@ -60,13 +72,14 @@ function populateModelSelector(availableModels, selectedModel) {
     modelSelector.innerHTML = ''; // clear existing models
     availableModels.forEach((model) => {
         const option = new Option(model, model);
-        option.className = 'bg-[#2d2d2d]';
+        option.className = 'bg-[#2d2d2d33]';
         modelSelector.add(option);
     });
     document.getElementById('modelSelector').value = selectedModel;
 }
 
 // Create a new message. If it's an assistant message, store it as the currentAssistantMessage.
+// 创建一条新消息。如果是助手消息，则将其存储为当前助手消息。
 function addMessage(content, isUser = true) {
     const loadingIndicator = chatContainer.querySelector('.loading-indicator');
     if (loadingIndicator) {
@@ -74,12 +87,18 @@ function addMessage(content, isUser = true) {
     }
 
     const messageDiv = document.createElement('div');
-    messageDiv.className = `flex ${isUser ? 'justify-end' : 'justify-start'} mb-2`;
-    messageDiv.innerHTML = `<div class="max-w-7xl w-full p-4 rounded-lg ${
-        isUser
-            ? 'bg-[#0066AD] text-[#ffffff] mx-auto'
-            : 'bg-[#252526] text-[#d4d4d4] border border-[#404040] mx-auto'
-    } shadow-lg transition-all duration-200 hover:shadow-xl"><div class="prose max-w-none"><div class="whitespace-pre-wrap [&_a]:text-[#3794ff] [&_a:hover]:text-[#4aa0ff] [&_code]:bg-[#373737]">${isUser ? content : md.render(content)}</div></div></div>`;
+    messageDiv.className = `flex ${isUser ? 'justify-end' : 'justify-start'} w-full`;
+
+    const border = isUser
+        ? 'bg-[#0066AD44] text-[#ffffff]'
+        : 'bg-[#0000] text-[#d4d4d4] border border-[#40404022]';
+    if (isUser) {
+        content = md.render(content);
+    }
+    content = content.trim();
+    messageDiv.innerHTML = `<div class="pl-2 pr-2 rounded-lg shadow-lg prose max-w-none ${border}">
+            <div class="whitespace-pre-wrap [&_a]:text-[#3794ff] [&_a:hover]:text-[#4aa0ff] [&_code]:bg-[#0000]">${content}</div>
+        </div>`;
 
     chatContainer.appendChild(messageDiv);
 
@@ -130,7 +149,7 @@ function showLoading() {
     const loadingDiv = document.createElement('div');
     loadingDiv.className = 'flex justify-center loading-indicator mb-6';
     loadingDiv.innerHTML = `
-        <div class="max-w-3xl p-4 rounded-lg bg-[#252526] border border-[#404040] w-full">
+        <div class="max-w-3xl p-4 rounded-lg bg-[#25252633] border border-[#404040] w-full">
             <div class="flex items-center space-x-3">
                 <div class="loader h-2 w-2 border-2 border-t-[#0e639c]"></div>
                 <span class="text-[#858585] text-sm font-medium">Processing query...</span>
@@ -145,8 +164,10 @@ function showLoading() {
 }
 
 function updateHistoryCount() {
-    const count = historyList.children.length;
-    historyCount.textContent = count.toString();
+    if (historyCount) {
+        const count = historyList.children.length;
+        historyCount.textContent = count.toString();
+    }
 }
 
 function filterHistory(searchText) {
@@ -190,11 +211,11 @@ function addToHistory(question, timestamp = new Date().toLocaleTimeString(), ans
         : question;
 
     historyItem.innerHTML = `
-        <div class="flex justify-between items-start gap-2">
+        <div class="flex justify-between items-start gap-1">
             <p class="text-sm text-[#d4d4d4] group-hover:text-white transition-colors">${truncatedQuestion}</p>
             <div class="flex items-center gap-2">
                 <span class="text-xs text-[#858585]">${timestamp}</span>
-                <button class="delete-history-item opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-[#ff4444] rounded">
+                <button class="delete-history-item opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-[#ff444444] rounded">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#858585] hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
@@ -235,13 +256,9 @@ function toggleGeneratingState(generating) {
     if (generating) {
         sendIcon.classList.add('hidden');
         stopIcon.classList.remove('hidden');
-        submitBtn.classList.add('bg-red-600', 'hover:bg-red-700');
-        submitBtn.classList.remove('bg-[#0066AD]', 'hover:bg-[#004d80]');
     } else {
         sendIcon.classList.remove('hidden');
         stopIcon.classList.add('hidden');
-        submitBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
-        submitBtn.classList.add('bg-[#0066AD]', 'hover:bg-[#004d80]');
     }
 }
 
@@ -262,7 +279,7 @@ async function sendMessage() {
     addToHistory(question, new Date().toLocaleTimeString(), '', true);
 
     toggleGeneratingState(true);
-    refreshBtn.disabled = true;
+    canRefresh = true;
     
     addMessage(question, true);
     questionInput.value = '';
@@ -321,8 +338,6 @@ function clearChat() {
     vscode.postMessage({ command: "newChat" });
 }
 
-refreshBtn.addEventListener('click', clearChat);
-
 window.addEventListener('message', event => {
     const { command, text, availableModels, selectedModel, messageStreamEnded, history, question } = event.data;
     
@@ -355,7 +370,7 @@ window.addEventListener('message', event => {
     } else if (command === "ollamaInstallErorr") {
         document.getElementById('ollamaError').classList.remove('hidden');
         submitBtn.disabled = false;
-        refreshBtn.disabled = false;
+        canRefresh = false;
     } else if (command === "ollamaModelsNotDownloaded") {
         const ollamaError = document.getElementById('ollamaError');
         ollamaError.innerHTML = `
@@ -364,23 +379,23 @@ window.addEventListener('message', event => {
         `;
         ollamaError.classList.remove('hidden');
         submitBtn.disabled = false;
-        refreshBtn.disabled = false;
+        canRefresh = false;
     } else if (messageStreamEnded === true) {
         submitBtn.disabled = false;
-        refreshBtn.disabled = false;
+        canRefresh = false;
         toggleGeneratingState(false);
     } else if (command === "initialQuestion" && question) {
         questionInput.value = question;
         questionInput.style.height = 'auto';
         questionInput.style.height = questionInput.scrollHeight + 'px';
+    } else if (command === "clearChat" && canRefresh) {
+        clearChat();
+    } else if (command === "history") {
+        historyPanel.classList.add('open');
     }
     if (availableModels && selectedModel) {
         populateModelSelector(availableModels, selectedModel);
     }
-});
-
-historyBtn.addEventListener('click', () => {
-    historyPanel.classList.add('open');
 });
 
 closeHistoryBtn.addEventListener('click', () => {
