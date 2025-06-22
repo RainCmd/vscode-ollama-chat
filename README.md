@@ -1,31 +1,29 @@
 # Ollama Chat
 
-VS Code extension that allows you to chat with self hosted models offline that can be downloaded from [ollama](https://ollama.com/download).
-
-<img src="./.docs/ollama-chat.gif" alt="ollam-chat-demo" width="80%">
+一款 VS Code 扩展程序，让您能够与自托管模型进行离线聊天，这些模型可以从以下链接下载： [ollama](https://ollama.com/download).
 
 ## Features
 
-- [x] Chat with a model
+- [x] 与模型聊天
 - [x] Chat with a selection
-- [ ] Add file as context to the chat
+- [ ] 添加文件作为聊天上下文
 
 ## How to use ?
 
-1. Install [Ollama](https://ollama.com/download) and download a model.
+1. 安装 [Ollama](https://ollama.com/download) 并下载模型。
 
     ```bash
     ollama run qwen2.5-coder
     ```
 
-2. Open  terminal and run `ollama serve` or manually open Ollama app
-3. Open the command palette in VSCode by pressing Cmd+Shift+P (Mac) or Ctrl+Shift+P (Windows/Linux), then run the Ollama Chat command. This will open the chat window shown in the screenshot.
+2. 打开终端并运行“ollama serve”命令，或者手动打开 Ollama 应用程序。
+3. 在 VSCode 中，通过按下 Cmd+Shift+P（适用于 Mac 系统）或 Ctrl+Shift+P（适用于 Windows 和 Linux 系统）来打开命令面板，然后运行“Ollama Chat”命令。这样就会打开如截图所示的聊天窗口。
 
 ## TODO
 
-* [ ] feat:  show error if user does not have ollama started either manually via opening the app or using `ollama serve`
-* [ ] feat:  show error if user does not have a model. Show them example command to install model
-* [ ] feat:  restrict user to certain number of tokens when sending message ?
-* [ ] feat:  processes pdfs ?
-* [ ] feat:  audio search
-* [ ] build: Do we need to use a build system like web pack ?
+* [ ] feat:  若用户未手动启动 ollama（通过打开应用程序或使用 `ollama serve` 命令）则会出现错误提示。
+* [ ] feat:  如果用户没有相关模型，则显示错误信息。向他们展示安装模型的示例命令。
+* [ ] feat:  限制用户在发送消息时使用的令牌数量？
+* [ ] feat:  处理 PDF 文件？
+* [ ] feat:  音频搜索
+* [ ] build: 我们是否需要使用像 Webpack 这样的构建系统呢？

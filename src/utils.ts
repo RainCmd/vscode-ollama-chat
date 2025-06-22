@@ -15,7 +15,7 @@ export function getNonce() {
 
 
 export function getDefaultModel(availableModels: string[]): string | undefined {
-    const config = vscode.workspace.getConfiguration('ollama-chat');
+    const config = vscode.workspace.getConfiguration('ollama-chat-rain');
     const configuredModel = config.get<string>('defaultModel');
 
     if (configuredModel && availableModels.includes(configuredModel)) {

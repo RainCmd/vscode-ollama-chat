@@ -1,14 +1,14 @@
 {
-  "name": "ollama-chat",
-  "displayName": "Ollama Chat",
-  "description": "Chat offline with models available to download from Ollama",
-  "publisher": "ashishalex",
-  "icon": ".docs/ollama-chat-logo.png",
+  "name": "ollama-chat-rain",
+  "displayName": "Ollama聊天",
+  "description": "跟ollama的大模型对话",
+  "publisher": "RainCmd",
+  "icon": ".docs/logo.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ashish10alex/vscode-ollama-chat.git"
+    "url": "https://github.com/RainCmd/vscode-ollama-chat.git"
   },
-  "version": "0.0.23",
+  "version": "0.0.1",
   "engines": {
     "vscode": "^1.96.0"
   },
@@ -17,40 +17,56 @@
   ],
   "activationEvents": [],
   "main": "./out/extension.js",
+  "scripts": {
+      "dependencies": "npm install",
+      "compile": "tsc -b",
+      "package": "vsce package"
+  },
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "OllamaChat",
+          "icon": ".docs/icon.png",
+          "title": "Ollama聊天"
+        }
+      ]
+    },
+    "views": {
+      "OllamaChat":[
+        {
+          "id": "OllamaChatView",
+          "icon": ".docs/icon.png",
+          "name": "Ollama聊天",
+          "type": "webview"
+        }
+      ]
+    },
     "commands": [
       {
-        "command": "ollama-chat.ollamaChat",
-        "title": "Ollama Chat"
+        "command": "ollama-chat-rain.ollamaChat",
+        "title": "Ollama聊天"
       },
       {
-        "command": "ollama-chat.askSelected",
-        "title": "Ollama Chat: Ask About Selection"
+        "command": "ollama-chat-rain.askSelected",
+        "title": "Ollama Chat: 回答选择的内容"
       }
     ],
     "configuration": {
       "title": "Ollama Chat",
       "properties": {
-        "ollama-chat.defaultModel": {
+        "ollama-chat-rain.defaultModel": {
           "type": "string",
-          "default": "",
-          "description": "Default model to use for chat. If not specified, the first available model will be used."
+          "default": "llama3.2:3b",
+          "description": "用于聊天的默认模型。如未指定，则会使用第一个可用的模型。"
         },
-        "ollama-chat.serverUrl": {
+        "ollama-chat-rain.serverUrl": {
           "type": "string",
           "default": "http://localhost:11434",
-          "description": "URL of the Ollama server. Use this to connect to a remote Ollama instance (e.g., http://192.168.1.100:11434)"
+          "description": "Ollama 服务器的 URL。使用此 URL 可以连接到远程的 Ollama 实例。 (e.g., http://192.168.1.100:11434)"
         }
       }
     }
-  },
-  "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src",
-    "test": "vscode-test"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
@@ -61,9 +77,10 @@
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
     "eslint": "^9.16.0",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.3"
   },
   "dependencies": {
+    "all": "^0.0.0",
     "ollama": "^0.5.12"
   }
 }
