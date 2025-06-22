@@ -14,14 +14,15 @@ const stopIcon = document.getElementById('stopIcon');
 let currentAssistantMessage = null;
 let autoScrollEnabled = true;  // flag to control auto-scroll
 let isGenerating = false;
-let canRefresh = false;
 
 function CW(msg) {
     vscode.postMessage({ command: "log", msg });
 }
 
-function scrollToBottom() {
-    chatContainer.scrollTop = chatContainer.scrollHeight;
+function scrollToBottomIfNecessary() {
+    if (autoScrollEnabled) {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
 }
 
 chatContainer.addEventListener('scroll', () => {
@@ -35,6 +36,7 @@ chatContainer.addEventListener('scroll', () => {
 
 window.onload = function() {
     questionInput.focus();
+    vscode.postMessage({ command: "pageLoaded" });
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -42,9 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hljs.addPlugin(new CopyButtonPlugin({ autohide: false }));
 });
 
-questionInput.style.height = 'auto';
-questionInput.addEventListener('input', () => {
-    // 输入文本时自动调整输入框的高度，最大200像素高
+function updateInputHeight() {
     questionInput.style.height = 'auto';
     
     const maxHeight = 200;
@@ -55,7 +55,9 @@ questionInput.addEventListener('input', () => {
         questionInput.style.overflow = 'hidden';
         questionInput.style.height = questionInput.scrollHeight + 'px';
     }
-});
+}
+questionInput.addEventListener('input', updateInputHeight);
+updateInputHeight();
 
 const md = markdownit({
     highlight: (str, lang) => {
@@ -78,13 +80,8 @@ function populateModelSelector(availableModels, selectedModel) {
     document.getElementById('modelSelector').value = selectedModel;
 }
 
-// Create a new message. If it's an assistant message, store it as the currentAssistantMessage.
-// 创建一条新消息。如果是助手消息，则将其存储为当前助手消息。
 function addMessage(content, isUser = true) {
-    const loadingIndicator = chatContainer.querySelector('.loading-indicator');
-    if (loadingIndicator) {
-        loadingIndicator.remove();
-    }
+    removeLoading();
 
     const messageDiv = document.createElement('div');
     messageDiv.className = `flex ${isUser ? 'justify-end' : 'justify-start'} w-full`;
@@ -102,29 +99,12 @@ function addMessage(content, isUser = true) {
 
     chatContainer.appendChild(messageDiv);
 
-    // When adding an assistant message, update the current block reference.
-    if (!isUser) {
-        currentAssistantMessage = messageDiv;
-    }
-
-    if (autoScrollEnabled) {
-        scrollToBottom();
-    }
-
+    scrollToBottomIfNecessary();
     return messageDiv;
 }
 
-function startNewAssistantAnswer(initialContent = '') {
-    const messageDiv = addMessage(initialContent, false);
-    messageDiv.style.display = "none";
-    currentAssistantMessage = messageDiv;
-}
-
 function updateLastAssistantMessage(content) {
-    const loadingIndicator = chatContainer.querySelector('.loading-indicator');
-    if (loadingIndicator) {
-        loadingIndicator.remove();
-    }
+    removeLoading();
 
     if (currentAssistantMessage) {
         if (currentAssistantMessage.style.display === "none") {
@@ -140,8 +120,13 @@ function updateLastAssistantMessage(content) {
         currentAssistantMessage = addMessage(content, false);
     }
 
-    if (autoScrollEnabled) {
-        scrollToBottom();
+    scrollToBottomIfNecessary();
+}
+
+function removeLoading() {
+    const loadingIndicator = chatContainer.querySelector('.loading-indicator');
+    if (loadingIndicator) {
+        loadingIndicator.remove();
     }
 }
 
@@ -158,12 +143,10 @@ function showLoading() {
     `;
     chatContainer.appendChild(loadingDiv);
 
-    if (autoScrollEnabled) {
-        scrollToBottom();
-    }
+    scrollToBottomIfNecessary();
 }
 
-function updateHistoryCount() {
+function updateRecordCount() {
     if (historyCount) {
         const count = historyList.children.length;
         historyCount.textContent = count.toString();
@@ -200,55 +183,49 @@ historySearch.addEventListener('input', debounce((e) => {
     filterHistory(e.target.value);
 }, 300));
 
-function addToHistory(question, timestamp = new Date().toLocaleTimeString(), answer = '', skipStorage = false) {
-    const historyItem = document.createElement('div');
-    historyItem.className = 'p-3 bg-[#2d2d2d] rounded-lg hover:bg-[#3c3c3c] cursor-pointer transition-colors group relative';
-    
-    historyItem.setAttribute('data-question', question);
-    
-    const truncatedQuestion = question.length > 60 
-        ? question.substring(0, 57) + '...' 
-        : question;
-
-    historyItem.innerHTML = `
-        <div class="flex justify-between items-start gap-1">
-            <p class="text-sm text-[#d4d4d4] group-hover:text-white transition-colors">${truncatedQuestion}</p>
-            <div class="flex items-center gap-2">
-                <span class="text-xs text-[#858585]">${timestamp}</span>
-                <button class="delete-history-item opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-[#ff444444] rounded">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#858585] hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
+function addRecords(records) {
+    historyList.innerHTML = '';
+    records.forEach(record => {
+        const recordItem = document.createElement('div');
+        recordItem.className = 'p-3 bg-[#0000] rounded-lg hover:bg-[#0002] cursor-pointer transition-colors group relative';
+        recordItem.setAttribute('match-text', record.name);
+        const truncatedName = record.name.length > 60 
+            ? record.name.substring(0, 57) + '...' 
+            : record.name;
+            
+        recordItem.innerHTML = `
+            <div class="flex justify-between items-start gap-1">
+                <p class="text-sm text-[#d4d4d4] group-hover:text-white transition-colors">${truncatedName}</p>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-[#858585]">${record.timestamp}</span>
+                    <button class="delete-history-item opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-[#ff444444] rounded">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#858585] hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
             </div>
-        </div>
-    `;
+        `;
+        
+        recordItem.onclick = () => {
+            vscode.postMessage({
+                command: "selectRecord",
+                uguid: record.uguid
+            });
+        };
 
-    // Add click event for delete button
-    const deleteBtn = historyItem.querySelector('.delete-history-item');
-    deleteBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        vscode.postMessage({
-            command: "deleteHistoryItem",
-            question: question,
-            timestamp: timestamp
+        const deleteBtn = recordItem.querySelector('.delete-history-item');
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            vscode.postMessage({
+                command: "deleteRecord",
+                uguid: record.uguid
+            });
         });
-        historyItem.remove();
-        updateHistoryCount();
-    });
 
-    // Add click event for loading the chat
-    historyItem.addEventListener('click', () => {
-        clearChat();
-        addMessage(question, true);
-        if (answer) {
-            addMessage(answer, false);
-        }
-        questionInput.focus();
+        historyList.insertBefore(recordItem, historyList.firstChild);
     });
-
-    historyList.insertBefore(historyItem, historyList.firstChild);
-    updateHistoryCount();
+    updateRecordCount();
 }
 
 function toggleGeneratingState(generating) {
@@ -267,6 +244,7 @@ async function sendMessage() {
     if (isGenerating) {
         vscode.postMessage({ command: 'stopResponse' });
         toggleGeneratingState(false);
+        removeLoading();
         return;
     }
 
@@ -275,18 +253,14 @@ async function sendMessage() {
         return;
     }
 
-    // Add to history UI only (storage will happen after we get the response)
-    addToHistory(question, new Date().toLocaleTimeString(), '', true);
-
     toggleGeneratingState(true);
-    canRefresh = true;
     
     addMessage(question, true);
     questionInput.value = '';
     questionInput.style.height = 'auto';
     
-    startNewAssistantAnswer();
     showLoading();
+    currentAssistantMessage = null;
 
     vscode.postMessage({
         command: "chat",
@@ -301,9 +275,6 @@ questionInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         sendMessage();
-    } else if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault(); 
-        clearChat();
     }
 });
 
@@ -315,62 +286,41 @@ modelSelector.addEventListener('change', function(e) {
 function clearChat() {
     const chatContainer = document.getElementById('chatContainer');
     
-    // Preserve these elements (header/model selector)
-    const preservedElements = Array.from(chatContainer.children).filter(child => {
-        return child.classList.contains('text-center') || // Header container
-               child.classList.contains('loading-indicator'); // Any loading indicators
-    });
-
-    // Remove all children except preserved elements
     while (chatContainer.firstChild) {
         chatContainer.removeChild(chatContainer.firstChild);
     }
 
-    // Add back preserved elements
-    preservedElements.forEach(element => {
-        chatContainer.appendChild(element);
-    });
-
     currentAssistantMessage = null;
     questionInput.focus();
+}
 
-    // Notify extension to clear conversation
-    vscode.postMessage({ command: "newChat" });
+function loadRecord(record) {
+    if (record) {
+        clearChat();
+        autoScrollEnabled = true;
+        record.messages.forEach(item => {
+            if (item.role === 'user') {
+                addMessage(item.content, true);
+            } else if (item.role === 'assistant') {
+                addMessage(item.content, false);
+            }
+            scrollToBottomIfNecessary();
+        });
+        questionInput.focus();
+    }
 }
 
 window.addEventListener('message', event => {
-    const { command, text, availableModels, selectedModel, messageStreamEnded, history, question } = event.data;
+    const { command, text, availableModels, selectedModel, records, uguid } = event.data;
     
-    if (command === "loadHistory" && history) {
-        historyList.innerHTML = '';
-        history.forEach(item => {
-            addToHistory(item.question, item.timestamp, item.answer, true);
-        });
-        updateHistoryCount();
-    } else if (command === "updateHistoryAnswer") {
-        // Find and update the history item
-        const historyItems = Array.from(historyList.children);
-        const targetItem = historyItems.find(item => {
-            const itemQuestion = item.querySelector('p').textContent;
-            const itemTimestamp = item.querySelector('span').textContent;
-            return itemQuestion === command && itemTimestamp === text;
-        });
-        
-        if (targetItem) {
-            // Update the click handler with the new answer
-            targetItem.onclick = () => {
-                clearChat();
-                addMessage(command, true);
-                addMessage(text, false);
-                questionInput.focus();
-            };
-        }
+    if (command === "loadRecord" && records) {
+        addRecords(records);
+        loadRecord(records.find(record => record.uguid === uguid));
     } else if (command === "chatResponse") {
         updateLastAssistantMessage(text);
     } else if (command === "ollamaInstallErorr") {
         document.getElementById('ollamaError').classList.remove('hidden');
         submitBtn.disabled = false;
-        canRefresh = false;
     } else if (command === "ollamaModelsNotDownloaded") {
         const ollamaError = document.getElementById('ollamaError');
         ollamaError.innerHTML = `
@@ -380,20 +330,15 @@ window.addEventListener('message', event => {
         ollamaError.classList.remove('hidden');
         submitBtn.disabled = false;
         canRefresh = false;
-    } else if (messageStreamEnded === true) {
+    } else if (command === "messageStreamEnded") {
         submitBtn.disabled = false;
-        canRefresh = false;
         toggleGeneratingState(false);
-    } else if (command === "initialQuestion" && question) {
-        questionInput.value = question;
-        questionInput.style.height = 'auto';
-        questionInput.style.height = questionInput.scrollHeight + 'px';
-    } else if (command === "clearChat" && canRefresh) {
+        currentAssistantMessage = null;
+    } else if (command === "newChat") {
         clearChat();
-    } else if (command === "history") {
+    } else if (command === "showRecords") {
         historyPanel.classList.add('open');
-    }
-    if (availableModels && selectedModel) {
+    } else if (command === "updateModelList") {
         populateModelSelector(availableModels, selectedModel);
     }
 });
@@ -403,10 +348,3 @@ closeHistoryBtn.addEventListener('click', () => {
     historySearch.value = '';
     filterHistory('');
 });
-
-function clearHistory() {
-    historyList.innerHTML = '';
-    updateHistoryCount();
-    historySearch.value = '';
-    vscode.postMessage({ command: "clearHistory" });
-}

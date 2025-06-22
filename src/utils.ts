@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { execSync } from 'child_process';
-import { ModelResponse } from 'ollama';
 
 
 export function getNonce() {

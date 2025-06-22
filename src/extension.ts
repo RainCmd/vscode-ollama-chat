@@ -1,21 +1,19 @@
 import * as vscode from 'vscode';
 import os from 'os';
-import { executableIsAvailable, getDefaultModel, systemPromptContent } from './utils';
+import { executableIsAvailable, getDefaultModel, getNonce, systemPromptContent } from './utils';
 import { getWebViewHtmlContent } from './chat';
 import { ModelResponse, Ollama } from 'ollama';
 
-// Add interface for message
 interface ChatMessage {
     role: 'system' | 'user' | 'assistant';
     content: string;
 }
 
-// Update ChatHistoryItem to include messages
-interface ChatHistoryItem {
-    question: string;
-    answer: string;
+interface chattingRecord {
+    uguid: string;
+    name: string;
     timestamp: string;
-    messages?: ChatMessage[]; // Add this to store conversation context
+    messages: ChatMessage[];
 }
 
 async function preloadModel(model: string) {
@@ -41,12 +39,64 @@ async function getAvaialableModels(ollamaInstance:Ollama): Promise<ModelResponse
     const availableModels = await ollamaInstance.list();
     return availableModels.models;
 }
-let webview: vscode.Webview;
+let webview: vscode.Webview | null = null;
+let currentRecord: chattingRecord | undefined = undefined;
 
+interface MessageData{
+    command: "loadRecord" | "chatResponse" | "deleteRecord" | "newChat" |
+    "ollamaInstallErorr" | "ollamaModelsNotDownloaded" |
+    "showRecords" | "updateModelList" | "messageStreamEnded" | "error";
+    text?: string;
+    availableModels?: string[];
+    selectedModel?: string;
+    records?: chattingRecord[];
+    uguid?: string;
+}
+function postMessage(data: MessageData) {
+    if (webview) {
+        webview.postMessage(data);
+    }
+}
+function initCurrentRecord(name: string, context: vscode.ExtensionContext) {
+    if (!currentRecord) {
+        currentRecord = {
+            uguid: getNonce(),
+            name: name,
+            timestamp: new Date().toLocaleTimeString(),
+            messages: []
+        };
+        currentRecord.messages.push({
+            role: "system",
+            content: systemPromptContent
+        });
+        const records = context.globalState.get<chattingRecord[]>('ollamaChatRecord', []);
+        records.push(currentRecord);
+        context.globalState.update('ollamaChatRecord', records);
+    }
+}
+function updateCurrentRecord(msg: ChatMessage, context: vscode.ExtensionContext) {
+    if (currentRecord) {
+        currentRecord.messages.push(msg);
+        const records = context.globalState.get<chattingRecord[]>('ollamaChatRecord', []);
+        const index = records.findIndex(value => value.uguid === currentRecord?.uguid);
+        if (index < 0) {
+            records.push(currentRecord);
+            postMessage({
+                command: "loadRecord",
+                records: records,
+                uguid: currentRecord.uguid
+            });
+        } else {
+            records[index] = currentRecord;
+        }
+        context.globalState.update('ollamaChatRecord', records);
+    }
+}
 export function activate(context: vscode.ExtensionContext) {
     globalThis.isRunningOnWindows = os.platform() === 'win32' ? true : false;
     globalThis.selectedModel = undefined;
     globalThis.stopResponse = false;
+    globalThis.chatting = false;
 
     const config = vscode.workspace.getConfiguration('ollama-chat-rain');
     const serverUrl = config.get<string>('serverUrl') || 'http://localhost:11434';
@@ -68,7 +118,6 @@ export function activate(context: vscode.ExtensionContext) {
             const ollamaInstance = new Ollama({
                 host: serverUrl
             });
-            let currentConversation: ChatMessage[] = [];
 
             let ollamaInstalled = true;
             if (serverUrl === 'http://localhost:11434') {
@@ -78,163 +127,135 @@ export function activate(context: vscode.ExtensionContext) {
                 }
             }
 
-            getAvaialableModels(ollamaInstance).then(availableModelsMeta => {
-                const availableModels = availableModelsMeta.map((model) => model.name);
-                selectedModel = getDefaultModel(availableModels);
-
-                if (ollamaInstalled && globalThis.selectedModel) {
-                    preloadModel(globalThis.selectedModel);
-                }
-
-                if (!selectedModel) {
-                    webview.postMessage({
-                        command: "ollamaModelsNotDownloaded",
-                        text: "No models available. Please download a model first."
-                    });
-                    return;
-                }
-
-                webview.postMessage({ availableModels: availableModels, selectedModel: selectedModel });
-
-                const chatHistory = extensionContext.globalState.get<ChatHistoryItem[]>('ollamaChatHistory', []);
-                webview.postMessage({
-                    command: 'loadHistory',
-                    history: chatHistory
-                });
-
-                // const editor = vscode.window.activeTextEditor;
-                // if (!editor) {
-                //     vscode.window.showWarningMessage('No active text editor found');
-                //     return;
-                // }
-
-                // const selection = editor.selection;
-                // const selectedText = editor.document.getText(selection);
-
-                // if (!selectedText) {
-                //     vscode.window.showWarningMessage('No text selected');
-                //     return;
-                // }
-
-                // const initialQuestion = `Selected text:\n\`\`\`\n${selectedText}\n\`\`\`\n\n`;
-                // if (initialQuestion) {
-                //     view.postMessage({
-                //         command: 'initialQuestion',
-                //         question: initialQuestion
-                //     });
-                // }
-            });
-
             webview.onDidReceiveMessage(async (message: any) => {
                 let responseText = "";
 
-                if (message.command === 'chat' || message.command === 'stopResponse') {
-                    if(message.command === 'chat'){
-                        globalThis.stopResponse = false;
-                    } else if(message.command === 'stopResponse'){
-                        globalThis.stopResponse = true;
-                    }
-
-                    const historyItem: ChatHistoryItem = {
-                        question: message.question,
-                        answer: '',
-                        timestamp: new Date().toLocaleTimeString(),
-                        messages: [...currentConversation]
-                    };
-
-                    const currentHistory = extensionContext.globalState.get<ChatHistoryItem[]>('ollamaChatHistory', []);
-                    const updatedHistory = [historyItem, ...currentHistory].slice(0, 50);
-
-                    // Add system prompt only if conversation is empty
-                    if (currentConversation.length === 0) {
-                        currentConversation.push({ 
-                            role: 'system', 
-                            content: systemPromptContent 
-                        });
-                    }
-
-                    currentConversation.push({
+                if (message.command === 'chat') {
+                    globalThis.stopResponse = false;
+                    initCurrentRecord(message.question, extensionContext);
+                    updateCurrentRecord({
                         role: 'user',
                         content: message.question
-                    });
+                    }, extensionContext);
 
                     try {
+                        globalThis.chatting = true;
                         const response = await ollamaInstance.chat({
                             model: selectedModel || "",
-                            messages: currentConversation,
+                            messages: message.question,
                             stream: true,
                         });
 
-                        // Collect full response
                         for await (const part of response) {
                             if(globalThis.stopResponse){
-                                webview.postMessage({messageStreamEnded: true});
+                                postMessage({ command: "messageStreamEnded" });
+                                response.abort();
                                 return;
+                            } else {
+                                responseText += part.message.content;
+                                postMessage({
+                                    command: "chatResponse", 
+                                    text: responseText,
+                                    selectedModel: selectedModel
+                                });
                             }
-                            responseText += part.message.content;
-                            webview.postMessage({
-                                command: "chatResponse", 
-                                text: responseText,
-                                selectedModel: selectedModel
-                            });
                         }
 
-                        // Add assistant response to conversation
-                        currentConversation.push({
+                        updateCurrentRecord({
                             role: 'assistant',
                             content: responseText
-                        });
-
-                        // Update history item with the complete answer
-                        historyItem.answer = responseText;
-                        historyItem.messages = [...currentConversation];
-                        await extensionContext.globalState.update('ollamaChatHistory', updatedHistory);
-
-                        webview.postMessage({
-                            command: "updateHistoryAnswer",
-                            question: message.question,
-                            answer: responseText,
-                            timestamp: historyItem.timestamp
-                        });
-
-                        webview.postMessage({messageStreamEnded: true});
+                        }, extensionContext);
+                        postMessage({ command: "messageStreamEnded" });
                     } catch (error: any) {
                         if (error.name === 'AbortError') {
-                            webview.postMessage({messageStreamEnded: true});
+                            postMessage({ command: "messageStreamEnded" });
                         } else {
-                            webview.postMessage({
+                            postMessage({
                                 command: "error", 
                                 text: "An error occurred while processing your request"
                             });
                         }
+                    } finally {
+                        globalThis.chatting = false;
                     }
-                } else if (message.command === "deleteHistoryItem") {
-                    // Handle deleting individual history item
-                    const currentHistory = extensionContext.globalState.get<ChatHistoryItem[]>('ollamaChatHistory', []);
-                    const updatedHistory = currentHistory.filter(item =>
-                        !(item.question === message.question && item.timestamp === message.timestamp)
-                    );
-                    await extensionContext.globalState.update('ollamaChatHistory', updatedHistory);
+                } else if (message.command === "stopResponse") {
+                    globalThis.stopResponse = true;
+                } else if (message.command === "selectRecord" && !globalThis.chatting) {
+                    let records = extensionContext.globalState.get<chattingRecord[]>('ollamaChatRecord', []);
+                    currentRecord = records.find(item => item.uguid === message.uguid);
+                    postMessage({
+                        command: "loadRecord",
+                        records: records,
+                        uguid: currentRecord ? currentRecord.uguid : ""
+                    });
+                } else if (message.command === "deleteRecord" && !globalThis.chatting) {
+                    let records = extensionContext.globalState.get<chattingRecord[]>('ollamaChatRecord', []);
+                    records = records.filter(item =>item.uguid !== message.uguid);
+                    await extensionContext.globalState.update('ollamaChatRecord', records);
+                    if (currentRecord?.uguid === message.uguid) {
+                        postMessage({ command: "newChat" });
+                        currentRecord = undefined;
+                    }
+                    let uguid = "";
+                    if (currentRecord) {
+                        uguid = currentRecord.uguid;
+                    } else if (records.length > 0) {
+                        uguid = records[records.length - 1].uguid;
+                    }
+                    postMessage({
+                        command: "loadRecord",
+                        records: records,
+                        uguid: uguid
+                    });
                 } else if (message.command === "selectedModel") {
                     selectedModel = message.selectedModel;
-                } else if (message.command === "newChat") {
-                    currentConversation = [];
                 } else if (message.command === 'log') {
                     console.log(message.msg);
+                } else if (message.command === "pageLoaded") {
+                    
+                    const records = extensionContext.globalState.get<chattingRecord[]>('ollamaChatRecord', []);
+                    if (records.length > 0) {
+                        currentRecord = records[records.length - 1];
+                    }
+                    postMessage({
+                        command: 'loadRecord',
+                        records: records,
+                        uguid: currentRecord ? currentRecord.uguid : ""
+                    });
+                    
+                    getAvaialableModels(ollamaInstance).then(availableModelsMeta => {
+                        const availableModels = availableModelsMeta.map((model) => model.name);
+                        selectedModel = getDefaultModel(availableModels);
+
+                        if (ollamaInstalled && globalThis.selectedModel) {
+                            preloadModel(globalThis.selectedModel);
+                        }
+                        if (!selectedModel) {
+                            postMessage({
+                                command: "ollamaModelsNotDownloaded",
+                                text: "No models available. Please download a model first."
+                            });
+                            return;
+                        }
+                        
+                        postMessage({
+                            command: "updateModelList",
+                            availableModels: availableModels,
+                            selectedModel: selectedModel
+                        });
+                    });
                 }
             });
         }
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand("ollama-chat-rain.History", () => {
-        if (webview) {
-            webview.postMessage({ command: "history" });
-        }
+    context.subscriptions.push(vscode.commands.registerCommand("ollama-chat-rain.ShowRecord", () => {
+        postMessage({ command: "showRecords" });
      }));
     context.subscriptions.push(vscode.commands.registerCommand("ollama-chat-rain.NewChat", () => {
-        if (webview) {
-            webview.postMessage({ command: "clearChat" });
-        }
+        postMessage({ command: "newChat" });
+        currentRecord = undefined;
+        globalThis.stopResponse = true;
      }));
 }
 

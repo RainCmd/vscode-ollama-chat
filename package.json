@@ -45,7 +45,7 @@
     "menus": {
       "view/title":[
         {
-          "command": "ollama-chat-rain.History",
+          "command": "ollama-chat-rain.ShowRecord",
           "when": "view == OllamaChat.View",
           "group": "navigation"
         },
@@ -58,7 +58,7 @@
     },
     "commands": [
       {
-        "command": "ollama-chat-rain.History",
+        "command": "ollama-chat-rain.ShowRecord",
         "title": "历史记录",
         "icon": "$(timeline-open)"
       },

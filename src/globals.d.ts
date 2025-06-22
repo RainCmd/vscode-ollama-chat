@@ -12,5 +12,9 @@ declare global {
   var stopResponse: boolean;
 }
 
+declare global {
+  var chatting: boolean;
+}
+
 export {};
 

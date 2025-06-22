@@ -1,11 +1,8 @@
 import {  ExtensionContext, Uri, Webview} from "vscode";
-import { getNonce } from "./utils";
 
 export function getWebViewHtmlContent(context:ExtensionContext, webview: Webview ) {
 
-
 const scriptUri = webview.asWebviewUri(Uri.joinPath(context.extensionUri, "media", "js", "panel.js"));
-const nonce = getNonce();
 
 return /*html*/ `
 <!DOCTYPE html>
@@ -148,7 +145,7 @@ return /*html*/ `
         </div>
     </div>
 
-    <script nonce="${nonce}" type="text/javascript" src="${scriptUri}"></script>
+    <script type="text/javascript" src="${scriptUri}"></script>
 
 </body>
 </html>
