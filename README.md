@@ -26,3 +26,12 @@
 * [ ] feat:  处理 PDF 文件？
 * [ ] feat:  音频搜索
 * [ ] build: 我们是否需要使用像 Webpack 这样的构建系统呢？
+
+forked from [ashish10alex/vscode-ollama-chat](https://github.com/ashish10alex/vscode-ollama-chat)
+
+# 改动和问题修复
+- 把聊天界面改到活动栏视图中去
+- 聊天历史记录改为聊天记录，多个聊天之间互不影响
+- 界面布局和颜色调整
+- 修复大模型列表选项经常加载不出来的毛病
+- 修复有些错误提示不显示的bug
