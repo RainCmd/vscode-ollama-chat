@@ -19,20 +19,27 @@ const includeContext = document.getElementById('includeContext');
 let currentAssistantMessage = null;
 let autoScrollEnabled = true;  // flag to control auto-scroll
 let isGenerating = false;
+let includePaths = [];
 
 function CW(msg) {
     vscode.postMessage({ command: "log", msg });
 }
 
+function getFileName(path) {
+    let index = path.lastIndexOf('/');
+    if (index < 0) {
+        index = path.lastIndexOf('\\');
+    }
+    return path.substring(index + 1);
+}
 function setCurrentInclude(path, include) {
     if (path) {
+        if (!includePaths.includes(path) && include) {
+            includePaths.push(path);
+        }
         includeCurrent.style.display = "";
         includeContext.setAttribute("title", path);
-        let index = path.lastIndexOf('/');
-        if (index < 0) {
-            index = path.lastIndexOf('\\');
-        }
-        includeContext.textContent = path.substring(index + 1);
+        includeContext.textContent = getFileName(path);
         if (include) {
             includeIcon.style.display = "block";
             includeCloseIcon.style.display = "none";
@@ -285,8 +292,15 @@ async function sendMessage() {
     }
 
     toggleGeneratingState(true);
-    
-    addMessage(question, true);
+
+    let content = question;
+    if (includePaths.length > 0) {
+        content += "\n参考文件:";
+        includePaths.forEach(path => {
+            content += `<a href="file:///${path}" title="${path}">@${getFileName(path)}</a>`;
+        });
+    }
+    addMessage(content, true);
     questionInput.value = '';
     questionInput.style.height = 'auto';
     
@@ -295,7 +309,8 @@ async function sendMessage() {
 
     vscode.postMessage({
         command: "chat",
-        question
+        question,
+        includePaths,
     });
 }
 
@@ -379,6 +394,8 @@ window.addEventListener('message', event => {
     } else if (command === "error") {
         showErrorMsg("ERROR", text);
     } else if (command === "updateInclude") {
+        //todo 同时引用多个文件的功能还没做，每次update前先清空引用吧。。。
+        includePaths = [];
         setCurrentInclude(text, include);
     }
 });

@@ -95,6 +95,13 @@ function updateCurrentRecord(msg: ChatMessage, context: vscode.ExtensionContext)
         context.workspaceState.update('ollamaChatRecord', records);
     }
 }
+function getFileName(path: string) {
+    let index = path.lastIndexOf('/');
+    if (index < 0) {
+        index = path.lastIndexOf('\\');
+    }
+    return path.substring(index + 1);
+}
 function updateInclude() {
     let path = "";
     if (vscode.window.activeTextEditor) {
@@ -143,38 +150,58 @@ export function activate(context: vscode.ExtensionContext) {
             }
 
             webview.onDidReceiveMessage(async (message: any) => {
-                let responseText = "";
 
                 if (message.command === 'chat') {
                     globalThis.stopResponse = false;
-                    globalThis.chatting = true;
+                    let messages: ChatMessage[] = currentRecord ? [...currentRecord.messages] : [];
+                    if (messages.length > 10) {
+                        messages = messages.slice(messages.length - 10);
+                    }
+                    const refers: string[] = [...message.includePaths];
                     initCurrentRecord(message.question, extensionContext);
-                    if (globalThis.includeCurrent && vscode.window.activeTextEditor) {
-                        try {
-                            const path = vscode.window.activeTextEditor.document.uri.fsPath;
-                            const data = readFileSync(path, { encoding: "utf-8" });
-                            message.question =
-                            `
-                            user's question:${message.question}
 
-                            You can refer to the content of the document.
-                            document path:${path}
-                            document content:${data}
-                            `;
-                        } finally {
-                            
-                        }
-
+                    let content = message.question;
+                    if (refers.length > 0) {
+                        content += "\n参考文件:";
+                        refers.forEach(path => {
+                            content += `<a href="file:///${path}" title="${path}">@${getFileName(path)}</a>`;
+                        });
                     }
                     updateCurrentRecord({
                         role: 'user',
-                        content: message.question
+                        content: content
                     }, extensionContext);
 
+                    globalThis.chatting = true;
+                    content = message.question;
+                    if (refers.length > 0) {
+                        try {
+                            content =
+`
+user's question:${content}
+
+If necessary, you can refer to the content of the document.
+If the user's question has nothing to do with the document, then ignore the document path and content.\n
+`;
+                            refers.forEach(path => {
+                                const data = readFileSync(path, { encoding: "utf-8" });
+                                content +=
+`
+document path:${path}\n
+document content:${data}\n
+`;
+                            });
+                        } finally { }
+                    }
+                    messages.push({
+                        role: 'user',
+                        content: content
+                    });
                     try {
+                        let responseText = "";
                         const response = await ollamaInstance.chat({
                             model: selectedModel || "",
-                            messages: currentRecord?.messages,
+                            messages: messages,
                             stream: true,
                         });
 
