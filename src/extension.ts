@@ -142,7 +142,7 @@ export function activate(context: vscode.ExtensionContext) {
                         globalThis.chatting = true;
                         const response = await ollamaInstance.chat({
                             model: selectedModel || "",
-                            messages: message.question,
+                            messages: currentRecord?.messages,
                             stream: true,
                         });
 
@@ -256,6 +256,13 @@ export function activate(context: vscode.ExtensionContext) {
         postMessage({ command: "newChat" });
         currentRecord = undefined;
         globalThis.stopResponse = true;
+        
+        let records = extensionContext.globalState.get<chattingRecord[]>('ollamaChatRecord', []);
+        postMessage({
+            command: "loadRecord",
+            records: records,
+            uguid: ""
+        });
      }));
 }
 

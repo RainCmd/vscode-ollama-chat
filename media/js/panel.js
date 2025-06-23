@@ -89,7 +89,7 @@ function addMessage(content, isUser = true) {
     const border = isUser
         ? 'bg-[#0066AD44] text-[#ffffff]'
         : 'bg-[#0000] text-[#d4d4d4] border border-[#40404022]';
-    if (isUser) {
+    if (!isUser) {
         content = md.render(content);
     }
     content = content.trim();
@@ -292,11 +292,11 @@ function clearChat() {
 
     currentAssistantMessage = null;
     questionInput.focus();
+    toggleGeneratingState(false);
 }
 
 function loadRecord(record) {
     if (record) {
-        clearChat();
         autoScrollEnabled = true;
         record.messages.forEach(item => {
             if (item.role === 'user') {
@@ -315,6 +315,7 @@ window.addEventListener('message', event => {
     
     if (command === "loadRecord" && records) {
         addRecords(records);
+        clearChat();
         loadRecord(records.find(record => record.uguid === uguid));
     } else if (command === "chatResponse") {
         updateLastAssistantMessage(text);

@@ -59,7 +59,7 @@
     "commands": [
       {
         "command": "ollama-chat-rain.ShowRecord",
-        "title": "历史记录",
+        "title": "聊天记录",
         "icon": "$(timeline-open)"
       },
       {
