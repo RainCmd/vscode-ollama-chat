@@ -1,3 +1,5 @@
+### forked from [ashish10alex/vscode-ollama-chat](https://github.com/ashish10alex/vscode-ollama-chat)
+
 # Ollama Chat
 
 一款 VS Code 扩展程序，让您能够与自托管模型进行离线聊天，这些模型可以从以下链接下载： [ollama](https://ollama.com/download).
@@ -5,7 +7,7 @@
 ## Features
 
 - [x] 与模型聊天
-- [ ] 添加文件作为聊天上下文
+- [x] 添加文件作为聊天上下文
 
 ## How to use ?
 
@@ -27,8 +29,6 @@
 * [ ] feat:  音频搜索
 * [ ] build: 我们是否需要使用像 Webpack 这样的构建系统呢？
 
-forked from [ashish10alex/vscode-ollama-chat](https://github.com/ashish10alex/vscode-ollama-chat)
-
 # 改动和问题修复
 - 支持把当前文件作为上下文
 - 把聊天界面改到活动栏视图中去
@@ -36,3 +36,4 @@ forked from [ashish10alex/vscode-ollama-chat](https://github.com/ashish10alex/vs
 - 界面布局和颜色调整
 - 修复大模型列表选项经常加载不出来的毛病
 - 修复有些错误提示不显示的bug
+
