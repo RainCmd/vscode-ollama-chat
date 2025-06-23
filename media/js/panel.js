@@ -310,6 +310,15 @@ function loadRecord(record) {
     }
 }
 
+function showErrorMsg(title, message) {
+    const ollamaError = document.getElementById('ollamaError');
+    ollamaError.innerHTML = `
+        <p class="font-bold">${title}</p>
+        <p>${message}</p>
+    `;
+    ollamaError.classList.remove('hidden');
+}
+
 window.addEventListener('message', event => {
     const { command, text, availableModels, selectedModel, records, uguid } = event.data;
     
@@ -320,17 +329,12 @@ window.addEventListener('message', event => {
     } else if (command === "chatResponse") {
         updateLastAssistantMessage(text);
     } else if (command === "ollamaInstallErorr") {
-        document.getElementById('ollamaError').classList.remove('hidden');
+        showErrorMsg("Error: Ollama CLI not installed",
+            'Please install Ollama CLI to use this application. Visit <a href="https://ollama.com/download" class="underline" target="_blank" rel="noopener noreferrer">ollama.com</a> for installation instructions.');
         submitBtn.disabled = false;
     } else if (command === "ollamaModelsNotDownloaded") {
-        const ollamaError = document.getElementById('ollamaError');
-        ollamaError.innerHTML = `
-            <p class="font-bold">Error: Model Not Available</p>
-            <p>The configured model is not available. Please download it first or choose a different model.</p>
-        `;
-        ollamaError.classList.remove('hidden');
+        showErrorMsg("Error: Model Not Available", "The configured model is not available. Please download it first or choose a different model.");
         submitBtn.disabled = false;
-        canRefresh = false;
     } else if (command === "messageStreamEnded") {
         submitBtn.disabled = false;
         toggleGeneratingState(false);
@@ -341,6 +345,8 @@ window.addEventListener('message', event => {
         historyPanel.classList.add('open');
     } else if (command === "updateModelList") {
         populateModelSelector(availableModels, selectedModel);
+    } else if (command === "error") {
+        showErrorMsg("ERROR", text);
     }
 });
 

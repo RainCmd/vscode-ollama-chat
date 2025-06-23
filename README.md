@@ -5,7 +5,6 @@
 ## Features
 
 - [x] 与模型聊天
-- [x] Chat with a selection
 - [ ] 添加文件作为聊天上下文
 
 ## How to use ?

@@ -43,7 +43,7 @@ let webview: vscode.Webview | null = null;
 let currentRecord: chattingRecord | undefined = undefined;
 
 interface MessageData{
-    command: "loadRecord" | "chatResponse" | "deleteRecord" | "newChat" |
+    command: "loadRecord" | "chatResponse" | "newChat" |
     "ollamaInstallErorr" | "ollamaModelsNotDownloaded" |
     "showRecords" | "updateModelList" | "messageStreamEnded" | "error";
     text?: string;
@@ -123,7 +123,7 @@ export function activate(context: vscode.ExtensionContext) {
             if (serverUrl === 'http://localhost:11434') {
                 ollamaInstalled = executableIsAvailable("ollama");
                 if (ollamaInstalled === false) {
-                    webview.postMessage({ command: "ollamaInstallErorr", text: "ollama not installed" });
+                    webview.postMessage({ command: "ollamaInstallErorr"});
                 }
             }
 
@@ -172,7 +172,7 @@ export function activate(context: vscode.ExtensionContext) {
                         } else {
                             postMessage({
                                 command: "error", 
-                                text: "An error occurred while processing your request"
+                                text: error.message
                             });
                         }
                     } finally {
@@ -244,6 +244,8 @@ export function activate(context: vscode.ExtensionContext) {
                             selectedModel: selectedModel
                         });
                     });
+
+                    postMessage({command: "ollamaInstallErorr"});
                 }
             });
         }
@@ -256,7 +258,7 @@ export function activate(context: vscode.ExtensionContext) {
         postMessage({ command: "newChat" });
         currentRecord = undefined;
         globalThis.stopResponse = true;
-        
+
         let records = extensionContext.globalState.get<chattingRecord[]>('ollamaChatRecord', []);
         postMessage({
             command: "loadRecord",
