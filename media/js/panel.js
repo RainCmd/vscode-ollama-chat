@@ -293,18 +293,9 @@ async function sendMessage() {
 
     toggleGeneratingState(true);
 
-    let content = question;
-    if (includePaths.length > 0) {
-        content += "\n参考文件:";
-        includePaths.forEach(path => {
-            content += `<a href="file:///${path}" title="${path}">@${getFileName(path)}</a>`;
-        });
-    }
-    addMessage(content, true);
     questionInput.value = '';
     questionInput.style.height = 'auto';
     
-    showLoading();
     currentAssistantMessage = null;
 
     vscode.postMessage({
@@ -381,6 +372,9 @@ window.addEventListener('message', event => {
     } else if (command === "ollamaModelsNotDownloaded") {
         showErrorMsg("Error: Model Not Available", "The configured model is not available. Please download it first or choose a different model.");
         submitBtn.disabled = false;
+    } else if (command === "sendMessage") {
+        addMessage(text, true);
+        showLoading();
     } else if (command === "messageStreamEnded") {
         submitBtn.disabled = false;
         toggleGeneratingState(false);

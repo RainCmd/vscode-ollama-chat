@@ -39,10 +39,29 @@ export function executableIsAvailable(name: string) {
     }
 }
 
+export function getFileName(path: string) {
+    let index = path.lastIndexOf('/');
+    if (index < 0) {
+        index = path.lastIndexOf('\\');
+    }
+    return path.substring(index + 1);
+}
+
+export function escapeHtml(unsafe: string) {
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 export const systemPromptContent = `You are a helpful AI assistant. When providing information:
     1. Ensure your response is clear, concise, and directly addresses the user's query
     2. Include relevant links in markdown format: [text_of_link](address_to_resource)
     3. Add a "## Resources" header in markdown format above the links
     4. Only include links for reliable sources you've used to inform your answer
     5. If no specific resources were used, omit the Resources section
+    6. If necessary, you can refer to the content of the document.
+    7.If the user's question has nothing to do with the document, then ignore the document path and content,and do not include any related content.
 `;

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import os from 'os';
-import { executableIsAvailable, getDefaultModel, getNonce, systemPromptContent } from './utils';
+import * as utils from './utils';
 import { getWebViewHtmlContent } from './chat';
 import { ModelResponse, Ollama } from 'ollama';
 import { readFileSync } from 'fs';
@@ -45,7 +45,7 @@ let currentRecord: chattingRecord | undefined = undefined;
 
 interface MessageData{
     command: "loadRecord" | "chatResponse" | "newChat" |
-    "ollamaInstallErorr" | "ollamaModelsNotDownloaded" |
+    "ollamaInstallErorr" | "ollamaModelsNotDownloaded" | "sendMessage" |
     "showRecords" | "updateModelList" | "messageStreamEnded" | "error" |
     "updateInclude";
     text?: string;
@@ -63,14 +63,14 @@ function postMessage(data: MessageData) {
 function initCurrentRecord(name: string, context: vscode.ExtensionContext) {
     if (!currentRecord) {
         currentRecord = {
-            uguid: getNonce(),
+            uguid: utils.getNonce(),
             name: name,
             timestamp: new Date().toLocaleTimeString(),
             messages: []
         };
         currentRecord.messages.push({
             role: "system",
-            content: systemPromptContent
+            content: utils.systemPromptContent
         });
         const records = context.workspaceState.get<chattingRecord[]>('ollamaChatRecord', []);
         records.push(currentRecord);
@@ -95,13 +95,6 @@ function updateCurrentRecord(msg: ChatMessage, context: vscode.ExtensionContext)
         context.workspaceState.update('ollamaChatRecord', records);
     }
 }
-function getFileName(path: string) {
-    let index = path.lastIndexOf('/');
-    if (index < 0) {
-        index = path.lastIndexOf('\\');
-    }
-    return path.substring(index + 1);
-}
 function updateInclude() {
     let path = "";
     if (vscode.window.activeTextEditor) {
@@ -113,6 +106,7 @@ function updateInclude() {
         include: globalThis.includeCurrent
     });
 }
+
 export function activate(context: vscode.ExtensionContext) {
     globalThis.isRunningOnWindows = os.platform() === 'win32' ? true : false;
     globalThis.selectedModel = undefined;
@@ -124,7 +118,7 @@ export function activate(context: vscode.ExtensionContext) {
     const serverUrl = config.get<string>('serverUrl') || 'http://localhost:11434';
 
     if (serverUrl === 'http://localhost:11434') {
-        executableIsAvailable("ollama");
+        utils.executableIsAvailable("ollama");
     }
 
     const extensionContext = context;
@@ -143,7 +137,7 @@ export function activate(context: vscode.ExtensionContext) {
 
             let ollamaInstalled = true;
             if (serverUrl === 'http://localhost:11434') {
-                ollamaInstalled = executableIsAvailable("ollama");
+                ollamaInstalled = utils.executableIsAvailable("ollama");
                 if (ollamaInstalled === false) {
                     webview.postMessage({ command: "ollamaInstallErorr"});
                 }
@@ -156,15 +150,29 @@ export function activate(context: vscode.ExtensionContext) {
                     let messages: ChatMessage[] = currentRecord ? [...currentRecord.messages] : [];
                     if (messages.length > 10) {
                         messages = messages.slice(messages.length - 10);
+                        messages.unshift({
+                            role: "system",
+                            content: utils.systemPromptContent
+                        });
                     }
                     const refers: string[] = [...message.includePaths];
                     initCurrentRecord(message.question, extensionContext);
 
-                    let content = message.question;
+                    let content = utils.escapeHtml(message.question);
                     if (refers.length > 0) {
-                        content += "\n参考文件:";
+                        content += "\n";
                         refers.forEach(path => {
-                            content += `<a href="file:///${path}" title="${path}">@${getFileName(path)}</a>`;
+                            let range = "";
+                            if (vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.uri.fsPath === path) {
+                                const start = vscode.window.activeTextEditor.selection.start;
+                                const end = vscode.window.activeTextEditor.selection.end;
+                                if (start.line !== end.line) {
+                                    range += `:${start.line}-${end.line}`;
+                                } else if(start.character !== end.character) {
+                                    range += `:${start.line}`;
+                                }
+                            }
+                            content += `<a href="file:///${path}" title="${path}">@${utils.getFileName(path)}${range}</a>`;
                         });
                     }
                     updateCurrentRecord({
@@ -172,24 +180,27 @@ export function activate(context: vscode.ExtensionContext) {
                         content: content
                     }, extensionContext);
 
+                    postMessage({
+                        command: "sendMessage",
+                        text: content
+                    });
+
                     globalThis.chatting = true;
                     content = message.question;
                     if (refers.length > 0) {
                         try {
-                            content =
-`
-user's question:${content}
-
-If necessary, you can refer to the content of the document.
-If the user's question has nothing to do with the document, then ignore the document path and content.\n
-`;
+                            content = `user's question:${content}\n\n`;
                             refers.forEach(path => {
+                                const editor = vscode.window.activeTextEditor;
+                                if (editor && editor.document.uri.fsPath === path) {
+                                    const range = editor.selection;
+                                    if (range.start.line !== range.end.line || range.start.character !== range.end.character) {
+                                        content += `The text selected by the user:${editor.document.getText(editor.selection)}\n\n`;
+                                        return;
+                                    }
+                                }
                                 const data = readFileSync(path, { encoding: "utf-8" });
-                                content +=
-`
-document path:${path}\n
-document content:${data}\n
-`;
+                                content +=`The document path referenced by the user:${path}\ncontent:${data}\n\n`;
                             });
                         } finally { }
                     }
@@ -284,7 +295,7 @@ document content:${data}\n
                     
                     getAvaialableModels(ollamaInstance).then(availableModelsMeta => {
                         const availableModels = availableModelsMeta.map((model) => model.name);
-                        selectedModel = getDefaultModel(availableModels);
+                        selectedModel = utils.getDefaultModel(availableModels);
 
                         if (ollamaInstalled && globalThis.selectedModel) {
                             preloadModel(globalThis.selectedModel);
