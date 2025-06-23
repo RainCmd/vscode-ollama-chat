@@ -11,6 +11,11 @@ const historySearch = document.getElementById('historySearch');
 const sendIcon = document.getElementById('sendIcon');
 const stopIcon = document.getElementById('stopIcon');
 
+const includeCurrent = document.getElementById('includeCurrent');
+const includeIcon = document.getElementById('includeIcon');
+const includeCloseIcon = document.getElementById('includeCloseIcon');
+const includeContext = document.getElementById('includeContext');
+
 let currentAssistantMessage = null;
 let autoScrollEnabled = true;  // flag to control auto-scroll
 let isGenerating = false;
@@ -18,6 +23,30 @@ let isGenerating = false;
 function CW(msg) {
     vscode.postMessage({ command: "log", msg });
 }
+
+function setCurrentInclude(path, include) {
+    if (path) {
+        includeCurrent.style.display = "";
+        includeContext.setAttribute("title", path);
+        let index = path.lastIndexOf('/');
+        if (index < 0) {
+            index = path.lastIndexOf('\\');
+        }
+        includeContext.textContent = path.substring(index + 1);
+        if (include) {
+            includeIcon.style.display = "block";
+            includeCloseIcon.style.display = "none";
+        } else {
+            includeIcon.style.display = "none";
+            includeCloseIcon.style.display = "block";
+        }
+    } else {
+        includeCurrent.style.display = "none";
+    }
+}
+includeCurrent.onclick = () => {
+    vscode.postMessage({ command: "switchIncludeState" });
+};
 
 function scrollToBottomIfNecessary() {
     if (autoScrollEnabled) {
@@ -74,7 +103,7 @@ function populateModelSelector(availableModels, selectedModel) {
     modelSelector.innerHTML = ''; // clear existing models
     availableModels.forEach((model) => {
         const option = new Option(model, model);
-        option.className = 'bg-[#2d2d2d33]';
+        option.className = 'bg-[#2d2d2d]';
         modelSelector.add(option);
     });
     document.getElementById('modelSelector').value = selectedModel;
@@ -184,11 +213,12 @@ historySearch.addEventListener('input', debounce((e) => {
     filterHistory(e.target.value);
 }, 300));
 
-function addRecords(records) {
+function addRecords(records, current) {
     historyList.innerHTML = '';
     records.forEach(record => {
         const recordItem = document.createElement('div');
-        recordItem.className = 'p-3 bg-[#0000] rounded-lg hover:bg-[#0002] cursor-pointer transition-colors group relative';
+        const bg = record.uguid === current ? "bg-[#0377] hover:bg-[#07f7]" : "bg-[#0000] hover:bg-[#0002]";
+        recordItem.className = `p-3 crounded-lg ${bg} ursor-pointer transition-colors group relative`;
         recordItem.setAttribute('match-text', record.name);
         const truncatedName = record.name.length > 60 
             ? record.name.substring(0, 57) + '...' 
@@ -321,10 +351,10 @@ function showErrorMsg(title, message) {
 }
 
 window.addEventListener('message', event => {
-    const { command, text, availableModels, selectedModel, records, uguid } = event.data;
+    const { command, text, availableModels, selectedModel, records, uguid, include } = event.data;
     
     if (command === "loadRecord" && records) {
-        addRecords(records);
+        addRecords(records, uguid);
         clearChat();
         loadRecord(records.find(record => record.uguid === uguid));
     } else if (command === "chatResponse") {
@@ -348,6 +378,8 @@ window.addEventListener('message', event => {
         populateModelSelector(availableModels, selectedModel);
     } else if (command === "error") {
         showErrorMsg("ERROR", text);
+    } else if (command === "updateInclude") {
+        setCurrentInclude(text, include);
     }
 });
 

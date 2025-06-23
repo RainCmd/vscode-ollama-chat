@@ -2,7 +2,8 @@ import {  ExtensionContext, Uri, Webview} from "vscode";
 
 export function getWebViewHtmlContent(context:ExtensionContext, webview: Webview ) {
 
-const scriptUri = webview.asWebviewUri(Uri.joinPath(context.extensionUri, "media", "js", "panel.js"));
+    const scriptUri = webview.asWebviewUri(Uri.joinPath(context.extensionUri, "media", "js", "panel.js"));
+    const codiconUri = webview.asWebviewUri(Uri.joinPath(context.extensionUri, 'media', 'codicon.ttf'));
 
 return /*html*/ `
 <!DOCTYPE html>
@@ -35,6 +36,26 @@ return /*html*/ `
             padding: 1rem;
             border-bottom: 1px solid #404040;
         }
+
+        @font-face {
+            font-family: "codicon";
+            font-display: block;
+            src: url(${codiconUri}) format("truetype");
+        }
+        .codicon[class*='codicon-'] {
+            font: normal normal normal 16px/1 codicon;
+            display: inline-block;
+            text-decoration: none;
+            text-rendering: auto;
+            text-align: center;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            user-select: none;
+            -webkit-user-select: none;
+            -ms-user-select: none;
+        }
+        .codicon-eye:before { content: "\\ea70" }
+        .codicon-eye-closed:before { content: "\\eae7" }
     </style>
     <link rel="stylesheet" href="https://unpkg.com/highlightjs-copy/dist/highlightjs-copy.min.css" />
 </head>
@@ -58,7 +79,7 @@ return /*html*/ `
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#0066AD]" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
                 </svg>
-                <h2 class="text-[#cccccc] text-lg font-semibold">Chat History</h2>
+                <h2 class="text-[#cccccc] text-lg font-semibold">聊天历史记录</h2>
             </div>
             <button id="closeHistoryBtn" class="text-[#858585] hover:text-[#cccccc] transition-colors p-2 hover:bg-[#404040] rounded">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -75,7 +96,7 @@ return /*html*/ `
                     class="w-full px-4 py-2 bg-[#3c3c3c] text-[#cccccc] rounded-lg border border-[#404040]
                            focus:outline-none focus:border-[#0e639c] focus:ring-1 focus:ring-[#0e639c]
                            placeholder-[#858585]"
-                    placeholder="Search history..."
+                    placeholder="搜索聊天记录..."
                 />
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 absolute right-3 top-2.5 text-[#858585]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -96,6 +117,13 @@ return /*html*/ `
     <!-- Input Area -->
     <div class="border-t border-[#252526] p-1 bg-[#1e1e1e33]">
         <div class="flex flex-col">
+            <div class="flex">
+                <button id="includeCurrent" class="pl-2 pr-2 rounded-lg shadow-lg flex gap-2 text-[#7fff] border border-[#4444]">
+                    <div id="includeIcon" title="点击关闭文件作为上下文" class="codicon codicon-eye"></div>
+                    <div id="includeCloseIcon" title="点击开启文件作为上下文" class="codicon codicon-eye-closed"></div>
+                    <div id="includeContext" title=""></div>
+                </button>
+            </div>
             <textarea
                 id="questionInput"
                 class="w-full p-2 bg-[#3c3c3c00] text-[#cccccc] rounded border border-[#3c3c3c]
@@ -124,12 +152,7 @@ return /*html*/ `
                     </div>
                 </div>
                 <div class="w-full"></div>
-                <button
-                    id="submitBtn"
-                    class="h-fit px-4 py-2 bg-[#0000] rounded hover:bg-[#0000]
-                    focus:outline-none focus:ring-1 focus:ring-[#0000] border border-[#0000]
-                    disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#0000]"
-                >
+                <button id="submitBtn" class="h-fit px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed">
                     <span id="sendIcon" class="flex items-center gap-2 transform hover:scale-[1.3] transition-transform duration-200">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />

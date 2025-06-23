@@ -30,6 +30,7 @@
 forked from [ashish10alex/vscode-ollama-chat](https://github.com/ashish10alex/vscode-ollama-chat)
 
 # 改动和问题修复
+- 支持把当前文件作为上下文
 - 把聊天界面改到活动栏视图中去
 - 聊天历史记录改为聊天记录，多个聊天之间互不影响
 - 界面布局和颜色调整

@@ -16,5 +16,9 @@ declare global {
   var chatting: boolean;
 }
 
+declare global {
+  var includeCurrent: boolean;
+}
+
 export {};
 
