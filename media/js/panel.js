@@ -88,12 +88,13 @@ function addMessage(content, isUser = true) {
 
     const border = isUser
         ? 'bg-[#0066AD44] text-[#ffffff]'
-        : 'bg-[#0000] text-[#d4d4d4] border border-[#40404022]';
+        : 'bg-[#0000] text-[#d4d4d4] border border-[#40404022] w-full';
     if (!isUser) {
         content = md.render(content);
     }
     content = content.trim();
-    messageDiv.innerHTML = `<div class="pl-2 pr-2 rounded-lg shadow-lg prose max-w-none ${border}">
+    messageDiv.innerHTML =
+        `<div class="pl-2 pr-2 rounded-lg shadow-lg prose max-w-none ${border}">
             <div class="whitespace-pre-wrap [&_a]:text-[#3794ff] [&_a:hover]:text-[#4aa0ff] [&_code]:bg-[#0000]">${content}</div>
         </div>`;
 
