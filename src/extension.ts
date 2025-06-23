@@ -244,8 +244,6 @@ export function activate(context: vscode.ExtensionContext) {
                             selectedModel: selectedModel
                         });
                     });
-
-                    postMessage({command: "ollamaInstallErorr"});
                 }
             });
         }
