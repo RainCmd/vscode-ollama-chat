@@ -41,9 +41,11 @@ function setCurrentInclude(path, include) {
     if (include) {
         includeIcon.style.display = "block";
         includeCloseIcon.style.display = "none";
+        includeCurrent.className = "pl-2 pr-2 rounded-lg shadow-lg flex gap-2 text-[#7fff] border border-[#4444]";
     } else {
         includeIcon.style.display = "none";
         includeCloseIcon.style.display = "block";
+        includeCurrent.className = "pl-2 pr-2 rounded-lg shadow-lg flex gap-2 text-[#7ff7] border border-[#4444]";
     }
     if (path) {
         currentInclude = path;
