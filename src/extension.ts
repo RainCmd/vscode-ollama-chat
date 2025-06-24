@@ -61,7 +61,19 @@ function postMessage(data: MessageData) {
         webview.postMessage(data);
     }
 }
-function initCurrentRecord(name: string, context: vscode.ExtensionContext) {
+function getOllamaChatRecord(context: vscode.ExtensionContext) {
+    return context.workspaceState.get<chattingRecord[]>('ollamaChatRecord', []);
+}
+async function setOllamaChatRecord(context: vscode.ExtensionContext, records: chattingRecord[]) {
+    await context.workspaceState.update('ollamaChatRecord', records);
+}
+function getIncludeCurrent(context: vscode.ExtensionContext) {
+    return context.workspaceState.get<boolean>("includeCurrent", true);
+}
+async function setIncludeCurrent(context: vscode.ExtensionContext, value: boolean) {
+    return context.workspaceState.update("includeCurrent", value);
+}
+async function initCurrentRecord(name: string, context: vscode.ExtensionContext) {
     if (!currentRecord) {
         currentRecord = {
             uguid: utils.getNonce(),
@@ -69,15 +81,15 @@ function initCurrentRecord(name: string, context: vscode.ExtensionContext) {
             timestamp: new Date().toLocaleTimeString(),
             messages: []
         };
-        const records = context.workspaceState.get<chattingRecord[]>('ollamaChatRecord', []);
+        const records = getOllamaChatRecord(context);
         records.push(currentRecord);
-        context.workspaceState.update('ollamaChatRecord', records);
+        await setOllamaChatRecord(context, records);
     }
 }
-function updateCurrentRecord(msg: ChatMessage, context: vscode.ExtensionContext) {
+async function updateCurrentRecord(msg: ChatMessage, context: vscode.ExtensionContext) {
     if (currentRecord) {
         currentRecord.messages.push(msg);
-        const records = context.workspaceState.get<chattingRecord[]>('ollamaChatRecord', []);
+        const records = getOllamaChatRecord(context);
         const index = records.findIndex(value => value.uguid === currentRecord?.uguid);
         if (index < 0) {
             records.push(currentRecord);
@@ -89,7 +101,7 @@ function updateCurrentRecord(msg: ChatMessage, context: vscode.ExtensionContext)
         } else {
             records[index] = currentRecord;
         }
-        context.workspaceState.update('ollamaChatRecord', records);
+        await setOllamaChatRecord(context, records);
     }
 }
 function getSelectRange() {
@@ -105,7 +117,7 @@ function getSelectRange() {
     }
     return "";
 }
-function updateCurrentInclude() {
+function updateCurrentInclude(context: vscode.ExtensionContext) {
     let path = "";
     if (vscode.window.activeTextEditor) {
         path = vscode.window.activeTextEditor.document.uri.fsPath;
@@ -113,7 +125,7 @@ function updateCurrentInclude() {
     postMessage({
         command: "setCurrentInclude",
         text: path + getSelectRange(),
-        include: globalThis.includeCurrent
+        include: getIncludeCurrent(context)
     });
 }
 function collectFiles(dir: string, paths: string[]) {
@@ -161,7 +173,6 @@ export function activate(context: vscode.ExtensionContext) {
     globalThis.selectedModel = undefined;
     globalThis.stopResponse = false;
     globalThis.chatting = false;
-    globalThis.includeCurrent = true;
 
     const config = vscode.workspace.getConfiguration('ollama-chat-rain');
     const serverUrl = config.get<string>('serverUrl') || 'http://localhost:11434';
@@ -170,15 +181,14 @@ export function activate(context: vscode.ExtensionContext) {
         utils.executableIsAvailable("ollama");
     }
 
-    const extensionContext = context;
     context.subscriptions.push(vscode.window.registerWebviewViewProvider('OllamaChat.View', {
-        resolveWebviewView(webviewView: vscode.WebviewView, context: vscode.WebviewViewResolveContext, token: vscode.CancellationToken) {
+        resolveWebviewView(webviewView: vscode.WebviewView) {
             webview = webviewView.webview;
             webview.options = {
                 enableScripts: true,
-                localResourceRoots: [extensionContext.extensionUri]
+                localResourceRoots: [context.extensionUri]
             };
-            webview.html = getWebViewHtmlContent(extensionContext, webview);
+            webview.html = getWebViewHtmlContent(context, webview);
             
             const ollamaInstance = new Ollama({
                 host: serverUrl
@@ -205,7 +215,7 @@ export function activate(context: vscode.ExtensionContext) {
                         content: utils.systemPromptContent
                     });
                     const refers: string[] = message.paths;
-                    initCurrentRecord(message.question, extensionContext);
+                    await initCurrentRecord(message.question, context);
 
                     let content = utils.escapeHtml(message.question);
                     if (refers.length > 0) {
@@ -218,10 +228,10 @@ export function activate(context: vscode.ExtensionContext) {
                             content += `<a href="file:///${path}" title="${path}">@${utils.getFileName(path)}${range}</a>`;
                         });
                     }
-                    updateCurrentRecord({
+                    await updateCurrentRecord({
                         role: 'user',
                         content: content
-                    }, extensionContext);
+                    }, context);
 
                     postMessage({
                         command: "sendMessage",
@@ -274,10 +284,10 @@ export function activate(context: vscode.ExtensionContext) {
                             }
                         }
 
-                        updateCurrentRecord({
+                        await updateCurrentRecord({
                             role: 'assistant',
                             content: responseText
-                        }, extensionContext);
+                        }, context);
                         postMessage({ command: "messageStreamEnded" });
                     } catch (error: any) {
                         if (error.name === 'AbortError') {
@@ -294,7 +304,7 @@ export function activate(context: vscode.ExtensionContext) {
                 } else if (message.command === "stopResponse") {
                     globalThis.stopResponse = true;
                 } else if (message.command === "selectRecord" && !globalThis.chatting) {
-                    let records = extensionContext.workspaceState.get<chattingRecord[]>('ollamaChatRecord', []);
+                    let records = getOllamaChatRecord(context);
                     currentRecord = records.find(item => item.uguid === message.uguid);
                     postMessage({
                         command: "loadRecord",
@@ -302,9 +312,9 @@ export function activate(context: vscode.ExtensionContext) {
                         uguid: currentRecord ? currentRecord.uguid : ""
                     });
                 } else if (message.command === "deleteRecord" && !globalThis.chatting) {
-                    let records = extensionContext.workspaceState.get<chattingRecord[]>('ollamaChatRecord', []);
+                    let records = getOllamaChatRecord(context);
                     records = records.filter(item =>item.uguid !== message.uguid);
-                    await extensionContext.workspaceState.update('ollamaChatRecord', records);
+                    await setOllamaChatRecord(context, records);
                     if (currentRecord?.uguid === message.uguid) {
                         postMessage({ command: "newChat" });
                         currentRecord = undefined;
@@ -326,7 +336,7 @@ export function activate(context: vscode.ExtensionContext) {
                     console.log(message.msg);
                 } else if (message.command === "pageLoaded") {
                     
-                    const records = extensionContext.workspaceState.get<chattingRecord[]>('ollamaChatRecord', []);
+                    const records = getOllamaChatRecord(context);
                     if (records.length > 0) {
                         currentRecord = records[records.length - 1];
                     }
@@ -357,10 +367,10 @@ export function activate(context: vscode.ExtensionContext) {
                             selectedModel: selectedModel
                         });
                     });
-                    updateCurrentInclude();
+                    updateCurrentInclude(context);
                 } else if (message.command === "switchIncludeState") {
-                    includeCurrent = !includeCurrent;
-                    updateCurrentInclude();
+                    await setIncludeCurrent(context, !getIncludeCurrent(context));
+                    updateCurrentInclude(context);
                 } else if (message.command === "selectFile") {
                     vscode.workspace.openTextDocument(message.path).then(doc => {
                         vscode.window.showTextDocument(doc, {
@@ -383,15 +393,15 @@ export function activate(context: vscode.ExtensionContext) {
         currentRecord = undefined;
         globalThis.stopResponse = true;
 
-        let records = extensionContext.workspaceState.get<chattingRecord[]>('ollamaChatRecord', []);
+        let records = getOllamaChatRecord(context);
         postMessage({
             command: "loadRecord",
             records: records,
             uguid: ""
         });
     }));
-    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(() => updateCurrentInclude()));
-    vscode.window.onDidChangeTextEditorSelection(() => updateCurrentInclude());
+    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(() => updateCurrentInclude(context)));
+    vscode.window.onDidChangeTextEditorSelection(() => updateCurrentInclude(context));
 }
 
 export function deactivate() { }
