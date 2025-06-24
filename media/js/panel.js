@@ -72,7 +72,7 @@ function updateIncludePaths(path, include) {
             });
         }
     } else if(includePaths.includes(path)) {
-        includePaths = includePaths.filter(value => value === path);
+        includePaths = includePaths.filter(value => value !== path);
         const dels = [];
         for (let index = 0; index < includePanel.children.length; index++) {
             const element = includePanel.children[index];
@@ -331,7 +331,11 @@ async function sendMessage() {
 
     const paths = [...includePaths];
     if (currentInclude) {
-        const path = currentInclude.split(currentInclude.lastIndexOf(":") + 1);
+        const fn = getFileName(currentInclude);
+        let path = currentInclude;
+        if (fn.lastIndexOf(":") >= 0) {
+            path = currentInclude.slice(0, currentInclude.lastIndexOf(":"));
+        }
         if (!paths.includes(path)) {
             paths.unshift(path);
         }

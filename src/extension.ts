@@ -69,10 +69,6 @@ function initCurrentRecord(name: string, context: vscode.ExtensionContext) {
             timestamp: new Date().toLocaleTimeString(),
             messages: []
         };
-        currentRecord.messages.push({
-            role: "system",
-            content: utils.systemPromptContent
-        });
         const records = context.workspaceState.get<chattingRecord[]>('ollamaChatRecord', []);
         records.push(currentRecord);
         context.workspaceState.update('ollamaChatRecord', records);
@@ -203,12 +199,12 @@ export function activate(context: vscode.ExtensionContext) {
                     let messages: ChatMessage[] = currentRecord ? [...currentRecord.messages] : [];
                     if (messages.length > 10) {
                         messages = messages.slice(messages.length - 10);
-                        messages.unshift({
-                            role: "system",
-                            content: utils.systemPromptContent
-                        });
                     }
-                    const refers: string[] = message.includePaths;
+                    messages.push({
+                        role: "system",
+                        content: utils.systemPromptContent
+                    });
+                    const refers: string[] = message.paths;
                     initCurrentRecord(message.question, extensionContext);
 
                     let content = utils.escapeHtml(message.question);
