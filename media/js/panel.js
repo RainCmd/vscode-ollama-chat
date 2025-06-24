@@ -11,14 +11,17 @@ const historySearch = document.getElementById('historySearch');
 const sendIcon = document.getElementById('sendIcon');
 const stopIcon = document.getElementById('stopIcon');
 
+const includePanel = document.getElementById('includePanel');
+const addInclude = document.getElementById('addInclude');
 const includeCurrent = document.getElementById('includeCurrent');
 const includeIcon = document.getElementById('includeIcon');
 const includeCloseIcon = document.getElementById('includeCloseIcon');
-const includeContext = document.getElementById('includeContext');
+const includeContent = document.getElementById('includeContent');
 
 let currentAssistantMessage = null;
 let autoScrollEnabled = true;  // flag to control auto-scroll
 let isGenerating = false;
+let currentInclude = "";
 let includePaths = [];
 
 function CW(msg) {
@@ -34,12 +37,10 @@ function getFileName(path) {
 }
 function setCurrentInclude(path, include) {
     if (path) {
-        if (!includePaths.includes(path) && include) {
-            includePaths.push(path);
-        }
+        currentInclude = path;
         includeCurrent.style.display = "";
-        includeContext.setAttribute("title", path);
-        includeContext.textContent = getFileName(path);
+        includeContent.setAttribute("title", path);
+        includeContent.textContent = getFileName(path);
         if (include) {
             includeIcon.style.display = "block";
             includeCloseIcon.style.display = "none";
@@ -51,9 +52,39 @@ function setCurrentInclude(path, include) {
         includeCurrent.style.display = "none";
     }
 }
-includeCurrent.onclick = () => {
-    vscode.postMessage({ command: "switchIncludeState" });
-};
+function updateIncludePaths(path, include) {
+    if (include) {
+        if (!includePaths.includes(path)) {
+            includePaths.push(path);
+            
+            const div = document.createElement('div');
+            div.title = path;
+            div.className = 'pl-2 pr-2 rounded-lg shadow-lg flex gap-2 text-[#7fff] border border-[#4444]';
+            div.innerHTML = `
+                <button title="${path}">${getFileName(path)}</button>
+                <button title="取消引用" class="codicon codicon-chrome-close"></button>
+            `;
+            includePanel.appendChild(div);
+            div.onclick = () => vscode.postMessage({ command: "selectFile", path: path });
+            div.querySelector(".codicon").addEventListener('click', e => {
+                e.stopPropagation();
+                updateIncludePaths(path, false);
+            });
+        }
+    } else if(includePaths.includes(path)) {
+        includePaths = includePaths.filter(value => value === path);
+        const dels = [];
+        for (let index = 0; index < includePanel.children.length; index++) {
+            const element = includePanel.children[index];
+            if (element.title === path) {
+                dels.push(element);
+            }
+        }
+        dels.forEach(value => value.remove());
+    }
+}
+addInclude.onclick = () => vscode.postMessage({ command: "addInclude" });
+includeCurrent.onclick = () => vscode.postMessage({ command: "switchIncludeState" });
 
 function scrollToBottomIfNecessary() {
     if (autoScrollEnabled) {
@@ -174,13 +205,13 @@ function showLoading() {
         <div class="max-w-3xl p-4 rounded-lg bg-[#25252633] border border-[#404040] w-full">
             <div class="flex items-center space-x-3">
                 <div class="loader h-2 w-2 border-2 border-t-[#0e639c]"></div>
-                <span class="text-[#858585] text-sm font-medium">Processing query...</span>
+                <span class="text-[#858585] text-sm font-medium">处理请求中...</span>
             </div>
         </div>
     `;
     chatContainer.appendChild(loadingDiv);
 
-    scrollToBottomIfNecessary();
+    chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
 function updateRecordCount() {
@@ -298,10 +329,17 @@ async function sendMessage() {
     
     currentAssistantMessage = null;
 
+    const paths = [...includePaths];
+    if (currentInclude) {
+        const path = currentInclude.split(currentInclude.lastIndexOf(":") + 1);
+        if (!paths.includes(path)) {
+            paths.unshift(path);
+        }
+    }
     vscode.postMessage({
         command: "chat",
         question,
-        includePaths,
+        paths,
     });
 }
 
@@ -387,10 +425,10 @@ window.addEventListener('message', event => {
         populateModelSelector(availableModels, selectedModel);
     } else if (command === "error") {
         showErrorMsg("ERROR", text);
-    } else if (command === "updateInclude") {
-        //todo 同时引用多个文件的功能还没做，每次update前先清空引用吧。。。
-        includePaths = [];
+    } else if (command === "setCurrentInclude") {
         setCurrentInclude(text, include);
+    } else if (command === "updateInclude") {
+        updateIncludePaths(text, true);
     }
 });
 

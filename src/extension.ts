@@ -3,7 +3,8 @@ import os from 'os';
 import * as utils from './utils';
 import { getWebViewHtmlContent } from './chat';
 import { ModelResponse, Ollama } from 'ollama';
-import { readFileSync } from 'fs';
+import * as fs from 'fs';
+import * as path from 'path';
 
 interface ChatMessage {
     role: 'system' | 'user' | 'assistant';
@@ -47,7 +48,7 @@ interface MessageData{
     command: "loadRecord" | "chatResponse" | "newChat" |
     "ollamaInstallErorr" | "ollamaModelsNotDownloaded" | "sendMessage" |
     "showRecords" | "updateModelList" | "messageStreamEnded" | "error" |
-    "updateInclude";
+    "setCurrentInclude" | "updateInclude";
     text?: string;
     availableModels?: string[];
     selectedModel?: string;
@@ -95,18 +96,70 @@ function updateCurrentRecord(msg: ChatMessage, context: vscode.ExtensionContext)
         context.workspaceState.update('ollamaChatRecord', records);
     }
 }
-function updateInclude() {
+function getSelectRange() {
+    const editor = vscode.window.activeTextEditor;
+    if (editor) {
+        const start = editor.selection.start;
+        const end = editor.selection.end;
+        if (start.line !== end.line) {
+            return `:${start.line}-${end.line}`;
+        } else if(start.character !== end.character) {
+            return `:${start.line}`;
+        }
+    }
+    return "";
+}
+function updateCurrentInclude() {
     let path = "";
     if (vscode.window.activeTextEditor) {
         path = vscode.window.activeTextEditor.document.uri.fsPath;
     }
     postMessage({
-        command: "updateInclude",
-        text: path,
+        command: "setCurrentInclude",
+        text: path + getSelectRange(),
         include: globalThis.includeCurrent
     });
 }
+function collectFiles(dir: string, paths: string[]) {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    entries.forEach(entry => {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+            collectFiles(fullPath, paths);
+        } else {
+            paths.push(fullPath);
+        }
+    });
+}
+function addInclude() {
+    if (!vscode.workspace.workspaceFolders) {
+        return;
+    }
+    const items: vscode.QuickPickItem[] = [];
 
+    vscode.workspace.workspaceFolders.forEach(folder => {
+        const paths: string[] = [];
+        collectFiles(folder.uri.fsPath, paths);
+        const length = folder.uri.fsPath.length + 1;
+        paths.forEach(value => {
+            items.push({
+                label: utils.getFileName(value),
+                description: value.slice(length),
+                detail: value,
+                iconPath: new vscode.ThemeIcon("file")
+            });
+        });
+    });
+    if (items.length === 0) {
+        return;
+    }
+    vscode.window.showQuickPick(items, { placeHolder: "选择想要引用的文件", matchOnDescription: true }).then(item => {
+        postMessage({
+            command: "updateInclude",
+            text: item?.detail,
+        });
+    });
+}
 export function activate(context: vscode.ExtensionContext) {
     globalThis.isRunningOnWindows = os.platform() === 'win32' ? true : false;
     globalThis.selectedModel = undefined;
@@ -155,7 +208,7 @@ export function activate(context: vscode.ExtensionContext) {
                             content: utils.systemPromptContent
                         });
                     }
-                    const refers: string[] = [...message.includePaths];
+                    const refers: string[] = message.includePaths;
                     initCurrentRecord(message.question, extensionContext);
 
                     let content = utils.escapeHtml(message.question);
@@ -164,13 +217,7 @@ export function activate(context: vscode.ExtensionContext) {
                         refers.forEach(path => {
                             let range = "";
                             if (vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.uri.fsPath === path) {
-                                const start = vscode.window.activeTextEditor.selection.start;
-                                const end = vscode.window.activeTextEditor.selection.end;
-                                if (start.line !== end.line) {
-                                    range += `:${start.line}-${end.line}`;
-                                } else if(start.character !== end.character) {
-                                    range += `:${start.line}`;
-                                }
+                                range = getSelectRange();
                             }
                             content += `<a href="file:///${path}" title="${path}">@${utils.getFileName(path)}${range}</a>`;
                         });
@@ -199,7 +246,7 @@ export function activate(context: vscode.ExtensionContext) {
                                         return;
                                     }
                                 }
-                                const data = readFileSync(path, { encoding: "utf-8" });
+                                const data = fs.readFileSync(path, { encoding: "utf-8" });
                                 content +=`The document path referenced by the user:${path}\ncontent:${data}\n\n`;
                             });
                         } finally { }
@@ -314,10 +361,19 @@ export function activate(context: vscode.ExtensionContext) {
                             selectedModel: selectedModel
                         });
                     });
-                    updateInclude();
+                    updateCurrentInclude();
                 } else if (message.command === "switchIncludeState") {
                     includeCurrent = !includeCurrent;
-                    updateInclude();
+                    updateCurrentInclude();
+                } else if (message.command === "selectFile") {
+                    vscode.workspace.openTextDocument(message.path).then(doc => {
+                        vscode.window.showTextDocument(doc, {
+                            preview: false,
+                            viewColumn: vscode.ViewColumn.One
+                        });
+                    });
+                } else if (message.command === "addInclude") {
+                    addInclude();
                 }
             });
         }
@@ -338,7 +394,8 @@ export function activate(context: vscode.ExtensionContext) {
             uguid: ""
         });
     }));
-    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(e => updateInclude()));
+    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(() => updateCurrentInclude()));
+    vscode.window.onDidChangeTextEditorSelection(() => updateCurrentInclude());
 }
 
 export function deactivate() { }

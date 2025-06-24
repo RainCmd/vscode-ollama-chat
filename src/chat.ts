@@ -57,6 +57,7 @@ return /*html*/ `
         .codicon-eye:before { content: "\\ea70" }
         .codicon-eye-closed:before { content: "\\eae7" }
         .codicon-link:before { content: "\\eb15" }
+        .codicon-chrome-close:before { content: "\\eab8" }
     </style>
     <link rel="stylesheet" href="https://unpkg.com/highlightjs-copy/dist/highlightjs-copy.min.css" />
 </head>
@@ -118,13 +119,13 @@ return /*html*/ `
     <!-- Input Area -->
     <div class="border-t border-[#252526] p-1 bg-[#1e1e1e33]">
         <div class="flex flex-col">
-            <div class="flex flex-wrap">
-                <!-- <button id="addInclude" class="pl-2 pr-2 rounded-lg shadow-lg flex gap-2 text-[#7fff] border border-[#4444] codicon codicon-link" title="点击添加文件作为上下文">
-                </button> -->
+            <div id="includePanel" class="flex flex-wrap">
+                <button id="addInclude" class="rounded-lg shadow-lg flex gap-2 text-[#7fff] border border-[#4444] codicon codicon-link" title="点击添加文件作为上下文">
+                </button>
                 <button id="includeCurrent" class="pl-2 pr-2 rounded-lg shadow-lg flex gap-2 text-[#7fff] border border-[#4444]">
                     <div id="includeIcon" title="点击关闭文件作为上下文" class="codicon codicon-eye"></div>
                     <div id="includeCloseIcon" title="点击开启文件作为上下文" class="codicon codicon-eye-closed"></div>
-                    <div id="includeContext" title=""></div>
+                    <div id="includeContent" title=""></div>
                 </button>
             </div>
             <textarea
