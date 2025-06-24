@@ -22,6 +22,7 @@ let currentAssistantMessage = null;
 let autoScrollEnabled = true;  // flag to control auto-scroll
 let isGenerating = false;
 let currentInclude = "";
+let isCurrentInclude = false;
 let includePaths = [];
 
 function CW(msg) {
@@ -36,18 +37,19 @@ function getFileName(path) {
     return path.substring(index + 1);
 }
 function setCurrentInclude(path, include) {
+    isCurrentInclude = include;
+    if (include) {
+        includeIcon.style.display = "block";
+        includeCloseIcon.style.display = "none";
+    } else {
+        includeIcon.style.display = "none";
+        includeCloseIcon.style.display = "block";
+    }
     if (path) {
         currentInclude = path;
         includeCurrent.style.display = "";
         includeContent.setAttribute("title", path);
         includeContent.textContent = getFileName(path);
-        if (include) {
-            includeIcon.style.display = "block";
-            includeCloseIcon.style.display = "none";
-        } else {
-            includeIcon.style.display = "none";
-            includeCloseIcon.style.display = "block";
-        }
     } else {
         includeCurrent.style.display = "none";
     }
@@ -330,7 +332,7 @@ async function sendMessage() {
     currentAssistantMessage = null;
 
     const paths = [...includePaths];
-    if (currentInclude) {
+    if (currentInclude && isCurrentInclude) {
         const fn = getFileName(currentInclude);
         let path = currentInclude;
         if (fn.lastIndexOf(":") >= 0) {
