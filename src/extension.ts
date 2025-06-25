@@ -75,6 +75,7 @@ function setContextNumber(context: vscode.ExtensionContext, count: number) {
         count = 0;
     }
     context.workspaceState.update("contextNumber", count);
+    return count;
 }
 function getIncludeCurrent(context: vscode.ExtensionContext) {
     return context.workspaceState.get<boolean>("includeCurrent", true);
@@ -185,12 +186,12 @@ function showSetContextNumber(context: vscode.ExtensionContext) {
         prompt: "较少的上下文条目可以让AI更快地做出回应"
     }).then(value => {
         if (value) {
-            const intNum: number = parseInt(value);
-            if (!isNaN(intNum)) {
-                setContextNumber(context, intNum);
+            let count: number = parseInt(value);
+            if (!isNaN(count)) {
+                count = setContextNumber(context, count);
                 postMessage({
                     command: "updateContextNumber",
-                    text: value,
+                    text: count.toString(),
                 });
             }
         }
