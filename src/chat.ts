@@ -58,6 +58,7 @@ return /*html*/ `
         .codicon-eye-closed:before { content: "\\eae7" }
         .codicon-link:before { content: "\\eb15" }
         .codicon-chrome-close:before { content: "\\eab8" }
+        .codicon-symbol-enum:before { content: "\\ea95" }
     </style>
     <link rel="stylesheet" href="https://unpkg.com/highlightjs-copy/dist/highlightjs-copy.min.css" />
 </head>
@@ -120,6 +121,10 @@ return /*html*/ `
     <div class="border-t border-[#252526] p-1 bg-[#1e1e1e33]">
         <div class="flex flex-col">
             <div id="includePanel" class="flex flex-wrap">
+                <button id="contextNumberBtn" title="对话联系的上下文条数" class="pl-2 pr-2 rounded-lg shadow-lg flex text-[#7fff] border border-[#4444]">
+                    <div class="codicon codicon-symbol-enum"></div>
+                    <div id="contextNumber">x10</div>
+                </button>
                 <button id="addInclude" class="rounded-lg shadow-lg flex gap-2 text-[#7fff] border border-[#4444] codicon codicon-link" title="点击添加文件作为上下文">
                 </button>
                 <button id="includeCurrent" class="pl-2 pr-2 rounded-lg shadow-lg flex gap-2 text-[#7fff] border border-[#4444]">
@@ -140,7 +145,7 @@ return /*html*/ `
             ></textarea>
             <div class="flex">
                 <!-- Model Selector -->
-                <div class="relative flex items-center justify-center w-56 transform hover:scale-[1.02] transition-transform duration-200">
+                <div class="relative flex items-center justify-center w-56">
                     <select
                         id="modelSelector"
                         class="w-full bg-[#0000] text-[#cccccc] rounded-xl border-2 border-[#0000]

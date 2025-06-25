@@ -11,6 +11,9 @@ const historySearch = document.getElementById('historySearch');
 const sendIcon = document.getElementById('sendIcon');
 const stopIcon = document.getElementById('stopIcon');
 
+const contextNumberBtn = document.getElementById('contextNumberBtn');
+const contextNumber = document.getElementById('contextNumber');
+
 const includePanel = document.getElementById('includePanel');
 const addInclude = document.getElementById('addInclude');
 const includeCurrent = document.getElementById('includeCurrent');
@@ -27,6 +30,11 @@ let includePaths = [];
 
 function CW(msg) {
     vscode.postMessage({ command: "log", msg });
+}
+
+contextNumberBtn.onclick = () => vscode.postMessage({ command: "setContextNumber" });
+function setContextNumber(value) {
+    contextNumber.textContent = `x${value}`;
 }
 
 function getFileName(path) {
@@ -437,6 +445,8 @@ window.addEventListener('message', event => {
         setCurrentInclude(text, include);
     } else if (command === "updateInclude") {
         updateIncludePaths(text, true);
+    } else if (command === "updateContextNumber") {
+        setContextNumber(text);
     }
 });
 

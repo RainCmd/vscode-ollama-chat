@@ -48,7 +48,7 @@ interface MessageData{
     command: "loadRecord" | "chatResponse" | "newChat" |
     "ollamaInstallErorr" | "ollamaModelsNotDownloaded" | "sendMessage" |
     "showRecords" | "updateModelList" | "messageStreamEnded" | "error" |
-    "setCurrentInclude" | "updateInclude";
+    "setCurrentInclude" | "updateInclude" | "updateContextNumber";
     text?: string;
     availableModels?: string[];
     selectedModel?: string;
@@ -66,6 +66,15 @@ function getOllamaChatRecord(context: vscode.ExtensionContext) {
 }
 async function setOllamaChatRecord(context: vscode.ExtensionContext, records: chattingRecord[]) {
     await context.workspaceState.update('ollamaChatRecord', records);
+}
+function getContextNumber(context: vscode.ExtensionContext) {
+    return context.workspaceState.get<number>("contextNumber", 10);
+}
+function setContextNumber(context: vscode.ExtensionContext, count: number) {
+    if (count < 0) {
+        count = 0;
+    }
+    context.workspaceState.update("contextNumber", count);
 }
 function getIncludeCurrent(context: vscode.ExtensionContext) {
     return context.workspaceState.get<boolean>("includeCurrent", true);
@@ -143,6 +152,7 @@ function addInclude() {
     if (!vscode.workspace.workspaceFolders) {
         return;
     }
+
     const items: vscode.QuickPickItem[] = [];
 
     vscode.workspace.workspaceFolders.forEach(folder => {
@@ -154,7 +164,7 @@ function addInclude() {
                 label: utils.getFileName(value),
                 description: value.slice(length),
                 detail: value,
-                iconPath: new vscode.ThemeIcon("file")
+                iconPath: new vscode.ThemeIcon("file"),
             });
         });
     });
@@ -166,6 +176,24 @@ function addInclude() {
             command: "updateInclude",
             text: item?.detail,
         });
+    });
+}
+function showSetContextNumber(context: vscode.ExtensionContext) {
+    vscode.window.showInputBox({
+        title: "AI回答问题时联系的上下文条数",
+        value: getContextNumber(context).toString(),
+        prompt: "较少的上下文条目可以让AI更快地做出回应"
+    }).then(value => {
+        if (value) {
+            const intNum: number = parseInt(value);
+            if (!isNaN(intNum)) {
+                setContextNumber(context, intNum);
+                postMessage({
+                    command: "updateContextNumber",
+                    text: value,
+                });
+            }
+        }
     });
 }
 export function activate(context: vscode.ExtensionContext) {
@@ -207,8 +235,9 @@ export function activate(context: vscode.ExtensionContext) {
                 if (message.command === 'chat') {
                     globalThis.stopResponse = false;
                     let messages: ChatMessage[] = currentRecord ? [...currentRecord.messages] : [];
-                    if (messages.length > 10) {
-                        messages = messages.slice(messages.length - 10);
+                    const contextNumber = getContextNumber(context);
+                    if (messages.length > contextNumber) {
+                        messages = messages.slice(messages.length - contextNumber);
                     }
                     messages.push({
                         role: "system",
@@ -341,6 +370,10 @@ export function activate(context: vscode.ExtensionContext) {
                         currentRecord = records[records.length - 1];
                     }
                     postMessage({
+                        command: "updateContextNumber",
+                        text: getContextNumber(context).toString(),
+                    });
+                    postMessage({
                         command: 'loadRecord',
                         records: records,
                         uguid: currentRecord ? currentRecord.uguid : ""
@@ -380,6 +413,8 @@ export function activate(context: vscode.ExtensionContext) {
                     });
                 } else if (message.command === "addInclude") {
                     addInclude();
+                } else if (message.command === "setContextNumber") {
+                    showSetContextNumber(context);
                 }
             });
         }
