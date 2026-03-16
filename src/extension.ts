@@ -49,6 +49,7 @@ interface MessageData{
     "ollamaInstallErorr" | "ollamaModelsNotDownloaded" | "sendMessage" |
     "showRecords" | "updateModelList" | "messageStreamEnded" | "error" |
     "setCurrentInclude" | "updateInclude" | "updateContextNumber";
+    thinking?: string;
     text?: string;
     availableModels?: string[];
     selectedModel?: string;
@@ -293,6 +294,7 @@ export function activate(context: vscode.ExtensionContext) {
                     });
                     try {
                         let responseText = "";
+                        let thinkingText = "";
                         const response = await ollamaInstance.chat({
                             model: selectedModel || "",
                             messages: messages,
@@ -305,9 +307,11 @@ export function activate(context: vscode.ExtensionContext) {
                                 response.abort();
                                 return;
                             } else {
+                                thinkingText += part.message.thinking;
                                 responseText += part.message.content;
                                 postMessage({
                                     command: "chatResponse", 
+                                    thinking: thinkingText,
                                     text: responseText,
                                     selectedModel: selectedModel
                                 });

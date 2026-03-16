@@ -183,7 +183,7 @@ function addMessage(content, isUser = true) {
     return messageDiv;
 }
 
-function updateLastAssistantMessage(content) {
+function updateLastAssistantMessage(thinking, content) {
     removeLoading();
 
     if (currentAssistantMessage) {
@@ -192,7 +192,11 @@ function updateLastAssistantMessage(content) {
         }
         const contentDiv = currentAssistantMessage.querySelector('.whitespace-pre-wrap');
         if (contentDiv) {
-            contentDiv.innerHTML = md.render(content);
+            if (content == "") {
+                contentDiv.innerHTML = thinking ? `<p class="text-[#858585] italic">${thinking}</p>` : "";
+            } else {
+                contentDiv.innerHTML = md.render(content);
+            }
             hljs.highlightAll();
         }
     } else {
@@ -411,14 +415,14 @@ function showErrorMsg(title, message) {
 }
 
 window.addEventListener('message', event => {
-    const { command, text, availableModels, selectedModel, records, uguid, include } = event.data;
+    const { command, thinking, text, availableModels, selectedModel, records, uguid, include } = event.data;
     
     if (command === "loadRecord" && records) {
         addRecords(records, uguid);
         clearChat();
         loadRecord(records.find(record => record.uguid === uguid));
     } else if (command === "chatResponse") {
-        updateLastAssistantMessage(text);
+        updateLastAssistantMessage(thinking, text);
     } else if (command === "ollamaInstallErorr") {
         showErrorMsg("Error: Ollama CLI not installed",
             'Please install Ollama CLI to use this application. Visit <a href="https://ollama.com/download" class="underline" target="_blank" rel="noopener noreferrer">ollama.com</a> for installation instructions.');
