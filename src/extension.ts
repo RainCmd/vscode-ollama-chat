@@ -8,6 +8,7 @@ import * as path from 'path';
 
 interface ChatMessage {
     role: 'system' | 'user' | 'assistant';
+    model?: string;
     content: string;
 }
 
@@ -320,6 +321,7 @@ export function activate(context: vscode.ExtensionContext) {
 
                         await updateCurrentRecord({
                             role: 'assistant',
+                            model: selectedModel,
                             content: responseText
                         }, context);
                         postMessage({ command: "messageStreamEnded" });

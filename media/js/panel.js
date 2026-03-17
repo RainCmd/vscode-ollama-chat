@@ -159,7 +159,7 @@ function populateModelSelector(availableModels, selectedModel) {
     document.getElementById('modelSelector').value = selectedModel;
 }
 
-function addMessage(content, isUser = true) {
+function addMessage(content, isUser = true, model = "") {
     removeLoading();
 
     const messageDiv = document.createElement('div');
@@ -173,9 +173,15 @@ function addMessage(content, isUser = true) {
     }
     content = content.trim();
     messageDiv.innerHTML =
-        `<div class="pl-2 pr-2 rounded-lg shadow-lg prose max-w-none ${border}">
-            <div class="whitespace-pre-wrap [&_a]:text-[#3794ff] [&_a:hover]:text-[#4aa0ff] [&_code]:bg-[#0000]">${content}</div>
-        </div>`;
+        model ? 
+            `<div class="pl-2 pr-2 rounded-lg shadow-lg prose max-w-none ${border}">
+                <div class="flex items-center gap-2 mb-1 text-xl text-[#878787] font-bold">${model}</div>
+                <div class="whitespace-pre-wrap [&_a]:text-[#3794ff] [&_a:hover]:text-[#4aa0ff] [&_code]:bg-[#0000]">${content}</div>
+            </div>`
+        :
+            `<div class="pl-2 pr-2 rounded-lg shadow-lg prose max-w-none ${border}">
+                <div class="whitespace-pre-wrap [&_a]:text-[#3794ff] [&_a:hover]:text-[#4aa0ff] [&_code]:bg-[#0000]">${content}</div>
+            </div>`;
 
     chatContainer.appendChild(messageDiv);
 
@@ -183,7 +189,7 @@ function addMessage(content, isUser = true) {
     return messageDiv;
 }
 
-function updateLastAssistantMessage(thinking, content) {
+function updateLastAssistantMessage(model, thinking, content) {
     removeLoading();
 
     if (currentAssistantMessage) {
@@ -201,7 +207,7 @@ function updateLastAssistantMessage(thinking, content) {
         }
     } else {
         // In case no block exists, create one.
-        currentAssistantMessage = addMessage(content, false);
+        currentAssistantMessage = addMessage(content, false, model);
     }
 
     scrollToBottomIfNecessary();
@@ -397,7 +403,7 @@ function loadRecord(record) {
             if (item.role === 'user') {
                 addMessage(item.content, true);
             } else if (item.role === 'assistant') {
-                addMessage(item.content, false);
+                addMessage(item.content, false, item.model);
             }
             scrollToBottomIfNecessary();
         });
@@ -422,7 +428,7 @@ window.addEventListener('message', event => {
         clearChat();
         loadRecord(records.find(record => record.uguid === uguid));
     } else if (command === "chatResponse") {
-        updateLastAssistantMessage(thinking, text);
+        updateLastAssistantMessage(selectedModel, thinking, text);
     } else if (command === "ollamaInstallErorr") {
         showErrorMsg("Error: Ollama CLI not installed",
             'Please install Ollama CLI to use this application. Visit <a href="https://ollama.com/download" class="underline" target="_blank" rel="noopener noreferrer">ollama.com</a> for installation instructions.');
