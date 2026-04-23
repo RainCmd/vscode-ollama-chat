@@ -26,7 +26,7 @@
   "scripts": {
     "dependencies": "npm install",
     "compile": "tsc -b",
-    "package": "vsce package"
+    "package": "npx vsce package"
   },
   "contributes": {
     "viewsContainers": {
